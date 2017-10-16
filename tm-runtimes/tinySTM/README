@@ -1,0 +1,36 @@
+To run STAMP with TinySTM:
+
+1) Download and extract STAMP-0.9.10
+2) Download and extract TinySTM-1.0.4 (both in the same directory)
+3) Rename the TinySTM-1.0.4 directory to TinySTM (or create a symbolic link)
+4) Replace the following files in the STAMP directory with the TinySTM
+   versions:
+   - Defines.common.mk -> common/Defines.common.mk
+   - Makefile.stm -> common/Makefile.stm
+   - tm.h -> lib/tm.h
+   (hint: rename the original files and use symbolic links to refer to
+   new files)
+5) Compile TinySTM (possibly changing compile flags)
+   - "cd TinySTM-1.0.4; make"
+6) Compile STAMP aplications
+   - "make -f Makefile.seq" for sequential version
+   - "make -f Makefile.stm" for STM version
+
+Compilation and execution can be automated with the stamp-test.sh
+script:
+
+1) Go in the STAMP root directory
+2) Run:
+   <path>/stamp-test.sh <log-file> <mode> <test> <threads>...
+   - <mode> is either "seq" for sequential runs or "stm" for STM runs
+   - <test> is either "sim" for short runs or "real" for long runs
+   - <threads> indicates the number of threads for each run
+
+For instance:
+
+1) Sequential runs
+   stamp-test.sh out-sim.seq seq sim 1
+   stamp-test.sh out-real.seq seq real 1
+2) STM runs
+   stamp-test.sh out-sim.stm stm sim 1 2 4 8
+   stamp-test.sh out-real.stm stm real 1 2 4 8
