@@ -13,48 +13,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -430,13 +430,60 @@
                                           mod_stats_init(); \
                                         }
 #      define TM_SHUTDOWN()             if (getenv("STM_STATS") != NULL) { \
-                                          unsigned long u; \
-                                          if (stm_get_global_stats("global_nb_commits", &u) != 0) \
-                                            printf("#commits    : %lu\n", u); \
-                                          if (stm_get_global_stats("global_nb_aborts", &u) != 0) \
-                                            printf("#aborts     : %lu\n", u); \
-                                          if (stm_get_global_stats("global_max_retries", &u) != 0) \
-                                            printf("Max retries : %lu\n", u); \
+                                          unsigned long u[16]; \
+                                          if (stm_get_global_stats("global_max_rs_entries", &u[0]) != 0) \
+                                            printf("Max Read Set: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_max_ws_entries", &u[0]) != 0) \
+                                            printf("Max Write Set: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_max_ws_unique_entries", &u[0]) != 0) \
+                                            printf("Max Write Set Unique: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_max_ol_used", &u[0]) != 0) \
+                                            printf("Max Operation Log: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_extensions", &u[0]) != 0) \
+                                            printf("Extensions: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_commits", &u[0]) != 0) \
+                                            printf("Commits: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_aborts", &u[0]) != 0) \
+                                            printf("Aborts: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_relocks", &u[0]) != 0) \
+                                            printf("Relocks: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_max_retries", &u[0]) != 0) \
+                                            printf("Max Retries: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_merges_manual", &u) != 0) \
+                                            printf("Merges (Manual): %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_merges_replay", &u) != 0) \
+                                            printf("Merges (Replay): %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_merges_ok", &u) != 0) \
+                                            printf("Merges (OK): %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_merges_retry", &u) != 0) \
+                                            printf("Merges (Retry): %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_reads", &u) != 0) \
+                                            printf("Reads: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_writes", &u) != 0) \
+                                            printf("Writes: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_aborts_reason", &u) != 0) { \
+                                            for (unsigned i = 0; i < 16; ++i) { \
+                                              switch (i) { \
+                                                case 0: printf("Unknown"); break; \
+                                                case 1: printf("Read-Read"); break; \
+                                                case 2: printf("Read-Write"); break; \
+                                                case 3: printf("Write-Read"); break; \
+                                                case 4: printf("Write-Write"); break; \
+                                                case 5: printf("Read Validate"); break; \
+                                                case 6: printf("Write Validate"); break; \
+                                                case 7: printf("Commit Validate"); break; \
+                                                case 8: printf("Irrevocable TX"); break; \
+                                                case 9: printf("Manual Abort"); break; \
+                                                case 10: printf("Killed TX"); break; \
+                                                case 11: printf("Signal"); break; \
+                                                case 12: printf("Write-Size Extend"); break; \
+                                                case 13: printf("Merged TX Commit"); break; \
+                                                case 14: printf("Merged TX Abort"); break; \
+                                                case 15: printf("Other"); break; \
+                                              } \
+                                              printf(": %lu\n", u[i]); \
+                                            } \
+                                          } \
                                         } \
                                         stm_exit()
 

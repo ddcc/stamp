@@ -9,10 +9,10 @@
 # Variables
 # ==============================================================================
 
-CFLAGS   += -DSTM -I$(STM)/include
+CFLAGS   += -DSTM -I$(STM)/include -g
 CPPFLAGS := $(CFLAGS)
-LDFLAGS  += -L$(STM)/lib
-LIBS     += -lstm
+LDFLAGS  += -L$(STM)/lib -L../../libtardis -Wl,-rpath .
+LIBS     += -lstm -ltardis
 
 
 # ==============================================================================

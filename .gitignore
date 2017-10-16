@@ -1,5 +1,7 @@
 *.o
 *.cluster_*
+*.csv
+*.log*
 bayes/bayes
 genome/genome
 intruder/intruder
