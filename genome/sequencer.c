@@ -83,6 +83,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef OUTPUT_VERIFY
+ #include <unistd.h>
+#endif
+
 #include "hash.h"
 #include "hashtable.h"
 #include "segments.h"
@@ -327,6 +331,43 @@ sequencer_run (void* argPtr)
     numUniqueSegment = hashtable_getSize(uniqueSegmentsPtr);
     entryIndex = 0;
 
+#ifdef OUTPUT_VERIFY
+    bool_t success = (numUniqueSegment == uniqueSegmentsPtr->numBucket - segmentLength + 1);
+    if (!success) {
+        char outFileName[1024];
+        FILE *segments;
+        char dir[1024];
+        getcwd(dir, sizeof(dir));
+        dir[sizeof(dir) - 1] = '\0';
+
+        char *line = NULL;
+        size_t sz = 0;
+
+        /* Check results */
+        sprintf(outFileName, "%s/genome/outputs/g%lds%ldn%ld.segments", dir, uniqueSegmentsPtr->numBucket, segmentLength, segmentsPtr->minNum);
+        if ((segments = fopen(outFileName, "r"))) {
+            success = TRUE;
+            for (unsigned int i = 0; i < uniqueSegmentsPtr->numBucket; ++i) {
+                ssize_t lz = getline(&line, &sz, segments);
+                assert(lz > 0);
+
+                success = success ? atoi(line) == uniqueSegmentsPtr->buckets[i]->size : success;
+# ifdef TM_DEBUG
+                if (!success)
+                    printf("index: %u, list: %p, actual: %d, computed: %ld\n", i, uniqueSegmentsPtr->buckets[i], atoi(line), uniqueSegmentsPtr->buckets[i]->size);
+# endif
+                assert(success);
+            }
+            fclose(segments);
+        }
+
+        if (line)
+            free(line);
+
+        abort();
+    }
+#endif /* OUTPUT_VERIFY */
+
 #if defined(HTM) || defined(STM)
     {
         /* Choose disjoint segments [i_start,i_stop) for each thread */
@@ -451,6 +492,7 @@ sequencer_run (void* argPtr)
              entryIndex += endInfoEntries[entryIndex].jumpToNext)
         {
             if (!endInfoEntries[entryIndex].isEnd) {
+                assert(endInfoEntries[entryIndex].jumpToNext > 0);
                 continue;
             }
 

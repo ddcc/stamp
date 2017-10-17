@@ -1,4 +1,5 @@
 *.o
+*.cluster_*
 bayes/bayes
 genome/genome
 intruder/intruder

@@ -5,7 +5,7 @@
 # ==============================================================================
 
 
-CFLAGS += -DOUTPUT_TO_STDOUT
+CFLAGS += -DOUTPUT_VERIFY
 
 PROG := kmeans
 

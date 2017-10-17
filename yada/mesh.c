@@ -569,7 +569,7 @@ mesh_check (mesh_t* meshPtr, long expectedNumElement)
 
     } /* breadth-first search */
 
-    printf("Number of elements      = %li\n", numElement);
+    printf("Number of elements (expected) = %li (%li)\n", numElement, expectedNumElement);
     printf("Number of bad triangles = %li\n", numBadTriangle);
 
     queue_free(searchQueuePtr);

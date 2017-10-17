@@ -342,7 +342,7 @@ MAIN(argc, argv)
         FILE* clustering_file;
         char outFileName[1024];
 
-        sprintf(outFileName, "%s.cluster_centres", filename);
+        sprintf(outFileName, "%s-m%dn%d.cluster_centres", filename, max_nclusters, min_nclusters);
         cluster_centre_file = fopen(outFileName, "w");
         for (i = 0; i < best_nclusters; i++) {
             fprintf(cluster_centre_file, "%d ", i);
@@ -354,7 +354,7 @@ MAIN(argc, argv)
         fclose(cluster_centre_file);
 
         /* Output: the closest cluster centre to each of the data points */
-        sprintf(outFileName, "%s.cluster_assign", filename);
+        sprintf(outFileName, "%s-m%dn%d.cluster_assign", filename, max_nclusters, min_nclusters);
         clustering_file = fopen(outFileName, "w");
         for (i = 0; i < numObjects; i++) {
             fprintf(clustering_file, "%d %d\n", i, cluster_assign[i]);
@@ -376,7 +376,58 @@ MAIN(argc, argv)
     }
 #endif /* OUTPUT TO_STDOUT */
 
-    printf("Time: %lg seconds\n", global_time);
+#ifdef OUTPUT_VERIFY
+    #include <libgen.h>
+
+    bool_t success = TRUE;
+    {
+        char outFileName[1024];
+        FILE *cluster_centre_result;
+        char dname[1024], *dir;
+        strncpy(dname, filename, sizeof(dname));
+        dname[sizeof(dname) - 1] = '\0';
+        dir = dirname(dname);
+        char bname[1024], *base;
+        strncpy(bname, filename, sizeof(bname));
+        bname[sizeof(bname) - 1] = '\0';
+        base = basename(bname);
+
+        char *line = NULL;
+        size_t sz = 0;
+
+        /* Check results */
+        sprintf(outFileName, "%s/../outputs/%s-m%dn%d.cluster_centres", dir, base, max_nclusters, min_nclusters);
+        if ((cluster_centre_result = fopen(outFileName, "r"))) {
+            for (int i = 0; i < best_nclusters; i++) {
+                ssize_t lz = getline(&line, &sz, cluster_centre_result);
+                if (lz <= 0)
+                    success = FALSE;
+                assert(lz);
+
+                char *tok = strtok(line, " ");
+                int ri = tok ? atoi(tok) : 0;
+                success = success ? tok && ri == i : success;
+                assert(success);
+                for (int j = 0; j < numAttributes; j++) {
+                    tok = strtok(NULL, " ");
+                    float rj = tok ? atof(tok) : 0.0;
+                    success = success ? tok && fabsf(rj - cluster_centres[i][j]) <= (max_nclusters + min_nclusters) * 0.5 * 10 * threshold : success;
+# ifdef TM_DEBUG
+                    printf("actual: %f, computed: %f, threshold: %f\n", cluster_centres[i][j], rj, (max_nclusters + min_nclusters) * 0.5 * threshold);
+# endif
+                    assert(success);
+                }
+            }
+            fclose(cluster_centre_result);
+        }
+
+        if (line)
+            free(line);
+    }
+    assert(success);
+#endif /* OUTPUT_VERIFY */
+
+    printf("Cluster time = %f\n", global_time);
 
     free(cluster_assign);
     free(attributes[0]);
@@ -391,7 +442,7 @@ MAIN(argc, argv)
 
     thread_shutdown();
 
-    MAIN_RETURN(0);
+    MAIN_RETURN(!success);
 }
 
 

@@ -147,14 +147,14 @@ MAIN(argc, argv)
     thread_startup(THREADS);
 
     puts("");
-    printf("Number of processors:       %ld\n", THREADS);
-    printf("Problem Scale:              %ld\n", SCALE);
-    printf("Max parallel edges:         %ld\n", MAX_PARAL_EDGES);
-    printf("Percent int weights:        %f\n",  PERC_INT_WEIGHTS);
-    printf("Probability unidirectional: %f\n",  PROB_UNIDIRECTIONAL);
-    printf("Probability inter-clique:   %f\n",  PROB_INTERCL_EDGES);
-    printf("Subgraph edge length:       %ld\n", SUBGR_EDGE_LENGTH);
-    printf("Kernel 3 data structure:    %ld\n", K3_DS);
+    printf("Number of processors =      %ld\n", THREADS);
+    printf("Problem Scale =             %ld\n", SCALE);
+    printf("Max parallel edges =        %ld\n", MAX_PARAL_EDGES);
+    printf("Percent int weights =       %f\n",  PERC_INT_WEIGHTS);
+    printf("Probability unidirectional =%f\n",  PROB_UNIDIRECTIONAL);
+    printf("Probability inter-clique =  %f\n",  PROB_INTERCL_EDGES);
+    printf("Subgraph edge length =      %ld\n", SUBGR_EDGE_LENGTH);
+    printf("Kernel 3 data structure =   %ld\n", K3_DS);
     puts("");
 
     /*
@@ -188,9 +188,9 @@ MAIN(argc, argv)
     TIMER_READ(stop);
 
     double time = TIMER_DIFF_SECONDS(start, stop);
+#if defined(USE_PARALLEL_DATA_GENERATION) && defined(OTM)
     totalTime += time;
-
-    printf("\nTime taken for Scalable Data Generation is %9.6f sec.\n\n", time);
+#endif
     printf("\n\tgenScalData() completed execution.\n");
 
 
@@ -231,7 +231,6 @@ MAIN(argc, argv)
     totalTime += time;
 
     printf("\n\tcomputeGraph() completed execution.\n");
-    printf("\nTime taken for kernel 1 is %9.6f sec.\n", time);
 
 #endif /* ENABLE_KERNEL1 */
 
@@ -486,7 +485,7 @@ MAIN(argc, argv)
 
 #endif /* ENABLE_KERNEL4 */
 
-    printf("\nTime taken for all is %9.6f sec.\n\n", totalTime);
+    printf("\nTotal time = %f\n\n", totalTime);
 
     /* -------------------------------------------------------------------------
      * Cleanup

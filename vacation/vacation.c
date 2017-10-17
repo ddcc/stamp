@@ -334,9 +334,10 @@ initializeClients (manager_t* managerPtr)
  * -- dependent on tasks generated for clients in initializeClients()
  * =============================================================================
  */
-void
+bool_t
 checkTables (manager_t* managerPtr)
 {
+    bool_t status = TRUE;
     long i;
     long numRelation = (long)global_params[PARAM_RELATIONS];
     MAP_T* customerTablePtr = managerPtr->customerTablePtr;
@@ -365,7 +366,8 @@ checkTables (manager_t* managerPtr)
         if ((c = MAP_FIND(customerTablePtr, i))) {
             customer_free_seq(c);
             if (MAP_REMOVE(customerTablePtr, i)) {
-                assert(!MAP_FIND(customerTablePtr, i));
+                status = status ? !MAP_FIND(customerTablePtr, i) : status;
+                assert(status);
             }
         }
     }
@@ -376,10 +378,12 @@ checkTables (manager_t* managerPtr)
         for (i = 1; i <= numRelation; i++) {
             reservation_t *r;
             if ((r = MAP_FIND(tablePtr, i))) {
-                assert(manager_add[t](managerPtr, i, 0, 0)); /* validate entry */
+                status = status ? manager_add[t](managerPtr, i, 0, 0) : status; /* validate entry */
+                assert(status);
                 reservation_free_seq(r);
                 if (MAP_REMOVE(tablePtr, i)) {
-                    assert(!MAP_REMOVE(tablePtr, i));
+                    status = status ? !MAP_REMOVE(tablePtr, i) : status;
+                    assert(status);
                 }
             }
         }
@@ -387,6 +391,7 @@ checkTables (manager_t* managerPtr)
 
     puts("done.");
     fflush(stdout);
+    return status;
 }
 
 
@@ -449,10 +454,11 @@ MAIN(argc, argv)
     GOTO_REAL();
     TIMER_READ(stop);
     puts("done.");
-    printf("Time = %0.6lf\n",
+    printf("Transaction time = %f\n",
            TIMER_DIFF_SECONDS(start, stop));
     fflush(stdout);
-    checkTables(managerPtr);
+    bool_t status = checkTables(managerPtr);
+    assert(status);
 
     /* Clean up */
     printf("Deallocating memory... ");
@@ -469,7 +475,7 @@ MAIN(argc, argv)
 
     thread_shutdown();
 
-    MAIN_RETURN(0);
+    MAIN_RETURN(!status);
 }
 
 
