@@ -150,7 +150,7 @@ void
 customer_free (TM_ARGDECL  customer_t* customerPtr)
 {
     list_t* reservationInfoListPtr =
-        (list_t*)TM_SHARED_READ(customerPtr->reservationInfoListPtr);
+        (list_t*)TM_SHARED_READ_P(customerPtr->reservationInfoListPtr);
     TMLIST_FREE(reservationInfoListPtr);
     TM_FREE(customerPtr);
 }

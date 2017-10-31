@@ -104,7 +104,7 @@ typedef struct args {
     int     nclusters;
     int*    membership;
     float** clusters;
-    int**   new_centers_len;
+    long**   new_centers_len;
     float** new_centers;
 } args_t;
 
@@ -130,7 +130,7 @@ work (void* argPtr)
     int     nclusters       = args->nclusters;
     int*    membership      = args->membership;
     float** clusters        = args->clusters;
-    int**   new_centers_len = args->new_centers_len;
+    long**   new_centers_len = args->new_centers_len;
     float** new_centers     = args->new_centers;
     float delta = 0.0;
     int index;
@@ -213,7 +213,7 @@ normal_exec (int       nthreads,
     int i;
     int j;
     int loop = 0;
-    int** new_centers_len; /* [nclusters]: no. of points in each cluster */
+    long** new_centers_len; /* [nclusters]: no. of points in each cluster */
     float delta;
     float** clusters;      /* out: [nclusters][nfeatures] */
     float** new_centers;   /* [nclusters][nfeatures] */
@@ -252,12 +252,12 @@ normal_exec (int       nthreads,
         const int cacheLineSize = 32;
         cluster_size += (cacheLineSize-1) - ((cluster_size-1) % cacheLineSize);
         alloc_memory = calloc(nclusters, cluster_size);
-        new_centers_len = (int**) malloc(nclusters * sizeof(int*));
+        new_centers_len = (long**) malloc(nclusters * sizeof(long*));
         new_centers = (float**) malloc(nclusters * sizeof(float*));
         assert(alloc_memory && new_centers && new_centers_len);
         for (i = 0; i < nclusters; i++) {
-            new_centers_len[i] = (int*)((char*)alloc_memory + cluster_size * i);
-            new_centers[i] = (float*)((char*)alloc_memory + cluster_size * i + sizeof(int));
+            new_centers_len[i] = (long*)((char*)alloc_memory + cluster_size * i);
+            new_centers[i] = (float*)((char*)alloc_memory + cluster_size * i + sizeof(long));
         }
     }
 

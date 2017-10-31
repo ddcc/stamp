@@ -175,7 +175,7 @@ TMlist_iter_next (TM_ARGDECL  list_iter_t* itPtr, list_t* listPtr)
     list_iter_t next = (list_iter_t)TM_SHARED_READ_P((*itPtr)->nextPtr);
     TM_LOCAL_WRITE_P(*itPtr, next);
 
-    return next->dataPtr;
+    return TM_SHARED_READ_P(next->dataPtr);
 }
 
 
@@ -520,7 +520,7 @@ TMfindPrevious (TM_ARGDECL  list_t* listPtr, void* dataPtr)
          nodePtr != NULL;
          nodePtr = (list_node_t*)TM_SHARED_READ_P(nodePtr->nextPtr))
     {
-        if (listPtr->compare(nodePtr->dataPtr, dataPtr) >= 0) {
+        if (listPtr->compare(TM_SHARED_READ_P(nodePtr->dataPtr), dataPtr) >= 0) {
             return prevPtr;
         }
         prevPtr = nodePtr;
@@ -560,17 +560,17 @@ list_find (list_t* listPtr, void* dataPtr)
 void*
 TMlist_find (TM_ARGDECL  list_t* listPtr, void* dataPtr)
 {
-    list_node_t* nodePtr;
+    list_node_t* nodePtr, *data;
     list_node_t* prevPtr = TMfindPrevious(TM_ARG  listPtr, dataPtr);
 
     nodePtr = (list_node_t*)TM_SHARED_READ_P(prevPtr->nextPtr);
 
     if ((nodePtr == NULL) ||
-        (listPtr->compare(nodePtr->dataPtr, dataPtr) != 0)) {
+        (listPtr->compare((data = TM_SHARED_READ_P(nodePtr->dataPtr)), dataPtr) != 0)) {
         return NULL;
     }
 
-    return (nodePtr->dataPtr);
+    return data;
 }
 
 
@@ -661,7 +661,7 @@ TMlist_insert (TM_ARGDECL  list_t* listPtr, void* dataPtr)
 
 #ifdef LIST_NO_DUPLICATES
     if ((currPtr != NULL) &&
-        listPtr->compare(currPtr->dataPtr, dataPtr) == 0) {
+        listPtr->compare(TM_SHARED_READ_P(currPtr->dataPtr), dataPtr) == 0) {
         return FALSE;
     }
 #endif
@@ -752,7 +752,7 @@ TMlist_remove (TM_ARGDECL  list_t* listPtr, void* dataPtr)
 
     nodePtr = (list_node_t*)TM_SHARED_READ_P(prevPtr->nextPtr);
     if ((nodePtr != NULL) &&
-        (listPtr->compare(nodePtr->dataPtr, dataPtr) == 0))
+        (listPtr->compare(TM_SHARED_READ_P(nodePtr->dataPtr), dataPtr) == 0))
     {
         TM_SHARED_WRITE_P(prevPtr->nextPtr, TM_SHARED_READ_P(nodePtr->nextPtr));
         TM_SHARED_WRITE_P(nodePtr->nextPtr, (struct list_node*)NULL);

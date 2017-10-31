@@ -695,8 +695,8 @@ TMinsert (TM_ARGDECL  rbtree_t* s, void* k, void* v, node_t* n)
         TX_STF_P(n, l, (node_t*)NULL);
         TX_STF_P(n, r, (node_t*)NULL);
         TX_STF_P(n, p, (node_t*)NULL);
-        TX_STF(n, k, k);
-        TX_STF(n, v, v);
+        TX_STF_P(n, k, k);
+        TX_STF_P(n, v, v);
         TX_STF(n, c, BLACK);
         TX_STF_P(s, root, n);
         return NULL;
@@ -713,8 +713,8 @@ TMinsert (TM_ARGDECL  rbtree_t* s, void* k, void* v, node_t* n)
             } else {
                 TX_STF_P(n, l, (node_t*)NULL);
                 TX_STF_P(n, r, (node_t*)NULL);
-                TX_STF(n, k, k);
-                TX_STF(n, v, v);
+                TX_STF_P(n, k, k);
+                TX_STF_P(n, v, v);
                 TX_STF_P(n, p, t);
                 TX_STF_P(t, l, n);
                 TX_FIX_AFTER_INSERTION(s, n);
@@ -727,8 +727,8 @@ TMinsert (TM_ARGDECL  rbtree_t* s, void* k, void* v, node_t* n)
             } else {
                 TX_STF_P(n, l, (node_t*)NULL);
                 TX_STF_P(n, r, (node_t*)NULL);
-                TX_STF(n, k, k);
-                TX_STF(n, v, v);
+                TX_STF_P(n, k, k);
+                TX_STF_P(n, v, v);
                 TX_STF_P(n, p, t);
                 TX_STF_P(t, r, n);
                 TX_FIX_AFTER_INSERTION(s, n);
@@ -1023,8 +1023,8 @@ TMdelete (TM_ARGDECL  rbtree_t* s, node_t* p)
      */
     if (TX_LDNODE(p, l) != NULL && TX_LDNODE(p, r) != NULL) {
         node_t* s = TX_SUCCESSOR(p);
-        TX_STF(p,k, TX_LDF_P(s, k));
-        TX_STF(p,v, TX_LDF_P(s, v));
+        TX_STF_P(p,k, TX_LDF_P(s, k));
+        TX_STF_P(p,v, TX_LDF_P(s, v));
         p = s;
     } /* p has 2 children */
 
