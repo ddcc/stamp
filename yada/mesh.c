@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -362,6 +362,7 @@ mesh_read (mesh_t* meshPtr, char* fileNamePrefix)
     long numCoordinate;
     long i;
     long numElement = 0;
+    char *ret;
 
     MAP_T* edgeMapPtr = MAP_ALLOC(NULL, &element_mapCompareEdge);
     assert(edgeMapPtr);
@@ -372,7 +373,8 @@ mesh_read (mesh_t* meshPtr, char* fileNamePrefix)
     snprintf(fileName, fileNameSize, "%s.node", fileNamePrefix);
     inputFile = fopen(fileName, "r");
     assert(inputFile);
-    fgets(inputBuff, inputBuffSize, inputFile);
+    ret = fgets(inputBuff, inputBuffSize, inputFile);
+    assert(ret == inputBuff);
     sscanf(inputBuff, "%li %li", &numEntry, &numDimension);
     assert(numDimension == 2); /* must be 2-D */
     numCoordinate = numEntry + 1; /* numbering can start from 1 */
@@ -401,11 +403,13 @@ mesh_read (mesh_t* meshPtr, char* fileNamePrefix)
     snprintf(fileName, fileNameSize, "%s.poly", fileNamePrefix);
     inputFile = fopen(fileName, "r");
     assert(inputFile);
-    fgets(inputBuff, inputBuffSize, inputFile);
+    ret = fgets(inputBuff, inputBuffSize, inputFile);
+    assert(ret == inputBuff);
     sscanf(inputBuff, "%li %li", &numEntry, &numDimension);
     assert(numEntry == 0); /* .node file used for vertices */
     assert(numDimension == 2); /* must be edge */
-    fgets(inputBuff, inputBuffSize, inputFile);
+    ret = fgets(inputBuff, inputBuffSize, inputFile);
+    assert(ret == inputBuff);
     sscanf(inputBuff, "%li", &numEntry);
     for (i = 0; i < numEntry; i++) {
         long id;
@@ -435,7 +439,8 @@ mesh_read (mesh_t* meshPtr, char* fileNamePrefix)
     snprintf(fileName, fileNameSize, "%s.ele", fileNamePrefix);
     inputFile = fopen(fileName, "r");
     assert(inputFile);
-    fgets(inputBuff, inputBuffSize, inputFile);
+    ret = fgets(inputBuff, inputBuffSize, inputFile);
+    assert(ret == inputBuff);
     sscanf(inputBuff, "%li %li", &numEntry, &numDimension);
     assert(numDimension == 3); /* must be triangle */
     for (i = 0; i < numEntry; i++) {
@@ -545,7 +550,6 @@ mesh_check (mesh_t* meshPtr, long expectedNumElement)
              * Continue breadth-first search
              */
             if (!MAP_CONTAINS(visitedMapPtr, (void*)neighborElementPtr)) {
-                bool_t isSuccess;
                 isSuccess = queue_push(searchQueuePtr,
                                        (void*)neighborElementPtr);
                 assert(isSuccess);
