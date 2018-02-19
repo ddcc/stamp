@@ -91,6 +91,14 @@
 #  define MAP_INSERT(map, key, data)  hashtable_insert(map, (void*)(key), (void*)(data))
 #  define MAP_REMOVE(map, key)        hashtable_remove(map, (void*)(key))
 
+#  define TMMAP_ALLOC(hash, cmp)      TMHASHTABLE_ALLOC(1, hash, cmp, 2, 2)
+#  define TMMAP_FREE(map)             TMHASHTABLE_FREE(map)
+#  define TMMAP_CONTAINS(map, key)    TMHASHTABLE_CONTAINS(map, (void*)(key))
+#  define TMMAP_FIND(map, key)        TMHASHTABLE_FIND(map, (void*)(key))
+#  define TMMAP_INSERT(map, key, data) \
+    TMHASHTABLE_INSERT(map, (void*)(key), (void*)(data))
+#  define TMMAP_REMOVE(map, key)      TMHASHTABLE_REMOVE(map, (void*)(key))
+
 #elif defined(MAP_USE_ATREE)
 
 #  include "atree.h"
@@ -235,6 +243,9 @@
 #  define MAP_INSERT(map, key, data) \
     rbtree_insert(map, (void*)(key), (void*)(data))
 #  define MAP_REMOVE(map, key)        rbtree_delete(map, (void*)(key))
+
+#  define TMMAP_ALLOC(hash, cmp)      TMRBTREE_ALLOC(cmp)
+#  define TMMAP_FREE(map, free)       TMRBTREE_FREE(map, free)
 
 #  define TMMAP_CONTAINS(map, key)    TMRBTREE_CONTAINS(map, (void*)(key))
 #  define TMMAP_FIND(map, key)        TMRBTREE_GET(map, (void*)(key))

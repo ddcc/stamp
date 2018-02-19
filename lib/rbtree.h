@@ -225,7 +225,7 @@ bool_t
 TMrbtree_contains (TM_ARGDECL  rbtree_t* r, void* key);
 
 
-#define TMRBTREE_ALLOC()          TMrbtree_alloc(TM_ARG_ALONE)
+#define TMRBTREE_ALLOC(cmp)       TMrbtree_alloc(TM_ARG  cmp)
 #define TMRBTREE_FREE(r)          TMrbtree_free(TM_ARG  r)
 #define TMRBTREE_INSERT(r, k, v)  TMrbtree_insert(TM_ARG  r, (void*)(k), (void*)(v))
 #define TMRBTREE_DELETE(r, k)     TMrbtree_delete(TM_ARG  r, (void*)(k))

@@ -256,8 +256,11 @@ process ()
                     TM_SHARED_READ(global_totalNumAdded) + totalNumAdded);
     TM_SHARED_WRITE(global_numProcess,
                     TM_SHARED_READ(global_numProcess) + numProcess);
+
+    TMregion_freeBad(regionPtr);
     TM_END();
 
+    PREGION_CLEARBAD(regionPtr);
     PREGION_FREE(regionPtr);
 
     TM_THREAD_EXIT();

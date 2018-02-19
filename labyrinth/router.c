@@ -390,10 +390,11 @@ router_solve (void* argPtr)
         coordinate_t* srcPtr = coordinatePairPtr->firstPtr;
         coordinate_t* dstPtr = coordinatePairPtr->secondPtr;
 
-        bool_t success = FALSE;
+        bool_t success;
         vector_t* pointVectorPtr = NULL;
 
         TM_BEGIN();
+        success = FALSE;
         grid_copy(myGridPtr, gridPtr); /* ok if not most up-to-date */
         if (PdoExpansion(routerPtr, myGridPtr, myExpansionQueuePtr,
                          srcPtr, dstPtr)) {

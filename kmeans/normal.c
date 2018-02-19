@@ -248,7 +248,7 @@ normal_exec (int       nthreads,
      * Allocate clusters on different cache lines to reduce false sharing.
      */
     {
-        int cluster_size = sizeof(int) + sizeof(float) * nfeatures;
+        int cluster_size = sizeof(long) + sizeof(float) * nfeatures;
         const int cacheLineSize = 32;
         cluster_size += (cacheLineSize-1) - ((cluster_size-1) % cacheLineSize);
         alloc_memory = calloc(nclusters, cluster_size);

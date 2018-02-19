@@ -323,13 +323,13 @@ TMhashtable_remove (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr);
 #define TMHASHTABLE_ITER_RESET(it, ht)    TMhashtable_iter_reset(TM_ARG  it, ht)
 #define TMHASHTABLE_ITER_HASNEXT(it, ht)  TMhashtable_iter_hasNext(TM_ARG  it, ht)
 #define TMHASHTABLE_ITER_NEXT(it, ht)     TMhashtable_iter_next(TM_ARG  it, ht)
-#define TMHASHTABLE_ALLOC(i, h, c, r, g)  TMhashtable_alloc(TM_ARG, i, h, c, r, g)
+#define TMHASHTABLE_ALLOC(i, h, c, r, g)  TMhashtable_alloc(TM_ARG i, h, c, r, g)
 #define TMHASHTABLE_FREE(ht)              TMhashtable_free(TM_ARG  ht)
 #define TMHASHTABLE_ISEMPTY(ht)           TMhashtable_isEmpty(TM_ARG  ht)
 #define TMHASHTABLE_GETSIZE(ht)           TMhashtable_getSize(TM_ARG  ht)
 #define TMHASHTABLE_FIND(ht, k)           TMhashtable_find(TM_ARG  ht, k)
 #define TMHASHTABLE_INSERT(ht, k, d)      TMhashtable_insert(TM_ARG  ht, k, d)
-#define TMHASHTABLE_REMOVE(ht)            TMhashtable_remove(TM_ARG  ht)
+#define TMHASHTABLE_REMOVE(ht, k)         TMhashtable_remove(TM_ARG  ht, k)
 
 
 #ifdef __cplusplus

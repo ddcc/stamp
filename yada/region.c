@@ -386,6 +386,20 @@ Pregion_clearBad (region_t* regionPtr)
 
 
 /* =============================================================================
+ * TMregion_freeBad
+ * =============================================================================
+ */
+void
+TMregion_freeBad (region_t* regionPtr)
+{
+    for (size_t i = 0; i < PVECTOR_GETSIZE(regionPtr->badVectorPtr); ++i) {
+        element_t* badElementPtr = (element_t*)vector_at(regionPtr->badVectorPtr, i);
+        TMELEMENT_FREE(badElementPtr);
+    }
+}
+
+
+/* =============================================================================
  * TMregion_transferBad
  * =============================================================================
  */
