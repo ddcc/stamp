@@ -424,8 +424,8 @@
                                           fprintf(stderr, "Error: unsupported long and pointer sizes\n"); \
                                           exit(1); \
                                         } \
-                                        stm_init(); \
-                                        mod_mem_init(0); \
+                                        stm_init(numThread); \
+                                        mod_mem_init(1); \
                                         if (getenv("STM_STATS") != NULL) { \
                                           mod_stats_init(); \
                                         }
