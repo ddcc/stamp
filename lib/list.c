@@ -88,11 +88,11 @@ TMfindPrevious (TM_ARGDECL  list_t* listPtr, void* dataPtr);
 
 TM_CALLABLE
 static void
-TMfreeList (TM_ARGDECL  list_node_t* nodePtr);
+TMfreeList (TM_ARGDECL  list_node_t* nodePtr, void (*TMfreeData)(void *));
 
 TM_CALLABLE
 void
-TMlist_free (TM_ARGDECL  list_t* listPtr);
+TMlist_free (TM_ARGDECL  list_t* listPtr, void (*TMfreeData)(void *));
 
 /* =============================================================================
  * compareDataPtrAddresses
@@ -361,10 +361,12 @@ TMfreeNode (TM_ARGDECL  list_node_t* nodePtr)
  * =============================================================================
  */
 static void
-freeList (list_node_t* nodePtr)
+freeList (list_node_t* nodePtr, void (*freeData)(void *))
 {
     if (nodePtr != NULL) {
-        freeList(nodePtr->nextPtr);
+        freeList(nodePtr->nextPtr, freeData);
+        if (freeData)
+            freeData(nodePtr->dataPtr);
         freeNode(nodePtr);
     }
 }
@@ -375,10 +377,12 @@ freeList (list_node_t* nodePtr)
  * =============================================================================
  */
 static void
-PfreeList (list_node_t* nodePtr)
+PfreeList (list_node_t* nodePtr, void (*PfreeData)(void *))
 {
     if (nodePtr != NULL) {
-        PfreeList(nodePtr->nextPtr);
+        PfreeList(nodePtr->nextPtr, PfreeData);
+        if (PfreeData)
+            PfreeData(nodePtr->dataPtr);
         PfreeNode(nodePtr);
     }
 }
@@ -389,11 +393,13 @@ PfreeList (list_node_t* nodePtr)
  * =============================================================================
  */
 static void
-TMfreeList (TM_ARGDECL  list_node_t* nodePtr)
+TMfreeList (TM_ARGDECL  list_node_t* nodePtr, void (*TMfreeData)(void *))
 {
     if (nodePtr != NULL) {
         list_node_t* nextPtr = (list_node_t*)TM_SHARED_READ_P(nodePtr->nextPtr);
-        TMfreeList(TM_ARG  nextPtr);
+        TMfreeList(TM_ARG  nextPtr, TMfreeData);
+        if (TMfreeData)
+            TMfreeData(nodePtr->dataPtr);
         TMfreeNode(TM_ARG  nodePtr);
     }
 }
@@ -404,9 +410,9 @@ TMfreeList (TM_ARGDECL  list_node_t* nodePtr)
  * =============================================================================
  */
 void
-list_free (list_t* listPtr)
+list_free (list_t* listPtr, void (*freeData)(void *))
 {
-    freeList(listPtr->head.nextPtr);
+    freeList(listPtr->head.nextPtr, freeData);
     free(listPtr);
 }
 
@@ -416,9 +422,9 @@ list_free (list_t* listPtr)
  * =============================================================================
  */
 void
-Plist_free (list_t* listPtr)
+Plist_free (list_t* listPtr, void (*PfreeData)(void *))
 {
-    PfreeList(listPtr->head.nextPtr);
+    PfreeList(listPtr->head.nextPtr, PfreeData);
     P_FREE(listPtr);
 }
 
@@ -428,10 +434,10 @@ Plist_free (list_t* listPtr)
  * =============================================================================
  */
 void
-TMlist_free (TM_ARGDECL  list_t* listPtr)
+TMlist_free (TM_ARGDECL  list_t* listPtr, void (*TMfreeData)(void *))
 {
     list_node_t* nextPtr = (list_node_t*)TM_SHARED_READ_P(listPtr->head.nextPtr);
-    TMfreeList(TM_ARG  nextPtr);
+    TMfreeList(TM_ARG  nextPtr, TMfreeData);
     TM_FREE(listPtr);
 }
 
@@ -772,9 +778,9 @@ TMlist_remove (TM_ARGDECL  list_t* listPtr, void* dataPtr)
  * =============================================================================
  */
 void
-list_clear (list_t* listPtr)
+list_clear (list_t* listPtr, void (*freeData)(void *))
 {
-    freeList(listPtr->head.nextPtr);
+    freeList(listPtr->head.nextPtr, freeData);
     listPtr->head.nextPtr = NULL;
     listPtr->size = 0;
 }
@@ -786,9 +792,9 @@ list_clear (list_t* listPtr)
  * =============================================================================
  */
 void
-Plist_clear (list_t* listPtr)
+Plist_clear (list_t* listPtr, void (*PfreeData)(void *))
 {
-    PfreeList(listPtr->head.nextPtr);
+    PfreeList(listPtr->head.nextPtr, PfreeData);
     listPtr->head.nextPtr = NULL;
     listPtr->size = 0;
 }

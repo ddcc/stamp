@@ -130,7 +130,7 @@ allocNode (long id)
         }
         nodePtr->childIdListPtr = list_alloc(&compareId);
         if (nodePtr->childIdListPtr == NULL) {
-            list_free(nodePtr->parentIdListPtr);
+            list_free(nodePtr->parentIdListPtr, NULL);
             free(nodePtr);
             return NULL;
         }
@@ -148,8 +148,8 @@ allocNode (long id)
 static void
 freeNode (net_node_t* nodePtr)
 {
-    Plist_free(nodePtr->childIdListPtr);
-    Plist_free(nodePtr->parentIdListPtr);
+    Plist_free(nodePtr->childIdListPtr, NULL);
+    Plist_free(nodePtr->parentIdListPtr, NULL);
     free(nodePtr);
 }
 

@@ -22,48 +22,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -1306,7 +1306,7 @@ releaseNode (node_t* n)
 {
 #ifndef SIMULATOR
     free(n);
-#endif    
+#endif
 }
 
 
@@ -1326,11 +1326,13 @@ TMreleaseNode  (TM_ARGDECL  node_t* n)
  * =============================================================================
  */
 static void
-freeNode (node_t* n)
+freeNode (node_t* n, void (*freeData)(void *, void *))
 {
     if (n) {
-        freeNode(n->l);
-        freeNode(n->r);
+        freeNode(n->l, freeData);
+        freeNode(n->r, freeData);
+        if (freeData)
+            freeData(n->k, n->v);
         releaseNode(n);
     }
 }
@@ -1341,11 +1343,13 @@ freeNode (node_t* n)
  * =============================================================================
  */
 static void
-TMfreeNode (TM_ARGDECL  node_t* n)
+TMfreeNode (TM_ARGDECL  node_t* n, void (*TMfreeData)(void *, void *))
 {
     if (n) {
-        TMfreeNode(TM_ARG  n->l);
-        TMfreeNode(TM_ARG  n->r);
+        TMfreeNode(TM_ARG  n->l, TMfreeData);
+        TMfreeNode(TM_ARG  n->r, TMfreeData);
+        if (TMfreeData)
+            TMfreeData(TM_ARG  n->k, n-> v);
         TMreleaseNode(TM_ARG  n);
     }
 }
@@ -1356,9 +1360,9 @@ TMfreeNode (TM_ARGDECL  node_t* n)
  * =============================================================================
  */
 void
-rbtree_free (rbtree_t* r)
+rbtree_free (rbtree_t* r, void (*freeData)(void *, void *))
 {
-    freeNode(r->root);
+    freeNode(r->root, freeData);
     free(r);
 }
 
@@ -1368,9 +1372,9 @@ rbtree_free (rbtree_t* r)
  * =============================================================================
  */
 void
-TMrbtree_free (TM_ARGDECL  rbtree_t* r)
+TMrbtree_free (TM_ARGDECL  rbtree_t* r, void (*TMfreeData)(void *, void *))
 {
-    TMfreeNode(TM_ARG  r->root);
+    TMfreeNode(TM_ARG  r->root, TMfreeData);
     TM_FREE(r);
 }
 

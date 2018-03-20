@@ -123,7 +123,7 @@ void
 mesh_free (mesh_t* meshPtr)
 {
     queue_free(meshPtr->initBadQueuePtr);
-    SET_FREE(meshPtr->boundarySetPtr);
+    SET_FREE(meshPtr->boundarySetPtr, NULL);
     free(meshPtr);
 }
 
@@ -150,7 +150,7 @@ mesh_insert (mesh_t* meshPtr, element_t* elementPtr, MAP_T* edgeMapPtr)
     long i;
     long numEdge = element_getNumEdge(elementPtr);
     for (i = 0; i < numEdge; i++) {
-        pair_t* edgePtr = element_getEdge(elementPtr, i);
+        edge_t* edgePtr = element_getEdge(elementPtr, i);
         if (!MAP_CONTAINS(edgeMapPtr, (void*)edgePtr)) {
             /*
              * Record existence of this edge
@@ -214,24 +214,24 @@ TMmesh_insert (TM_ARGDECL
     long numEdge = element_getNumEdge(elementPtr);
     for (i = 0; i < numEdge; i++) {
         edge_t* edgePtr = element_getEdge(elementPtr, i);
-        if (!MAP_CONTAINS(edgeMapPtr, (void*)edgePtr)) {
+        if (!TMMAP_CONTAINS(edgeMapPtr, (void*)edgePtr)) {
             /* Record existance of this edge */
             bool_t isSuccess;
             isSuccess =
-                PMAP_INSERT(edgeMapPtr, (void*)edgePtr, (void*)elementPtr);
+                TMMAP_INSERT(edgeMapPtr, (void*)edgePtr, (void*)elementPtr);
             assert(isSuccess);
         } else {
             /*
              * Shared edge; update each element's neighborList
              */
             bool_t isSuccess;
-            element_t* sharerPtr = (element_t*)MAP_FIND(edgeMapPtr, edgePtr);
+            element_t* sharerPtr = (element_t*)TMMAP_FIND(edgeMapPtr, edgePtr);
             assert(sharerPtr); /* cannot be shared by >2 elements */
             TMELEMENT_ADDNEIGHBOR(elementPtr, sharerPtr);
             TMELEMENT_ADDNEIGHBOR(sharerPtr, elementPtr);
-            isSuccess = PMAP_REMOVE(edgeMapPtr, edgePtr);
+            isSuccess = TMMAP_REMOVE(edgeMapPtr, edgePtr);
             assert(isSuccess);
-            isSuccess = PMAP_INSERT(edgeMapPtr,
+            isSuccess = TMMAP_INSERT(edgeMapPtr,
                                     edgePtr,
                                     NULL); /* marker to check >2 sharers */
             assert(isSuccess);
@@ -469,7 +469,7 @@ mesh_read (mesh_t* meshPtr, char* fileNamePrefix)
     fclose(inputFile);
 
     free(coordinates);
-    MAP_FREE(edgeMapPtr);
+    MAP_FREE(edgeMapPtr, NULL);
 
     return numElement;
 }
@@ -495,6 +495,15 @@ void
 mesh_shuffleBad (mesh_t* meshPtr, random_t* randomPtr)
 {
     queue_shuffle(meshPtr->initBadQueuePtr, randomPtr);
+}
+
+/* =============================================================================
+ * value_free
+ * =============================================================================
+ */
+void value_free(pair_t *p) {
+    if (p->firstPtr)
+        Pelement_free(p->firstPtr);
 }
 
 
@@ -564,7 +573,7 @@ mesh_check (mesh_t* meshPtr, long expectedNumElement)
     printf("Number of bad triangles = %li\n", numBadTriangle);
 
     queue_free(searchQueuePtr);
-    MAP_FREE(visitedMapPtr);
+    MAP_FREE(visitedMapPtr, (void (*)(void *))value_free);
 
     return ((numBadTriangle > 0 ||
              numFalseNeighbor > 0 ||

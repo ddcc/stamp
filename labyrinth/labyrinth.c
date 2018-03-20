@@ -182,6 +182,17 @@ parseArgs (long argc, char* const argv[])
     }
 }
 
+/* =============================================================================
+ * pathVectorFree
+ * =============================================================================
+ */
+void pathVectorFree(vector_t *myPathVectorPtr) {
+    for (size_t i = 0; i < vector_getSize(myPathVectorPtr); ++i) {
+        vector_t *pointVectorPtr = (vector_t*)vector_at(myPathVectorPtr, i);
+        PVECTOR_FREE(pointVectorPtr);
+    }
+    PVECTOR_FREE(myPathVectorPtr);
+}
 
 /* =============================================================================
  * main
@@ -247,6 +258,7 @@ MAIN(argc, argv)
     bool_t status = maze_checkPaths(mazePtr, pathVectorListPtr, global_doPrint);
     assert(status == TRUE);
     puts("Verification passed.");
+    list_free(pathVectorListPtr, (void (*)(void *))pathVectorFree);
     maze_free(mazePtr);
     router_free(routerPtr);
 

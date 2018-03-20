@@ -12,48 +12,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -85,14 +85,14 @@
 
 #  define MAP_T                       hashtable_t
 #  define MAP_ALLOC(hash, cmp)        hashtable_alloc(1, hash, cmp, 2, 2)
-#  define MAP_FREE(map)               hashtable_free(map)
+#  define MAP_FREE(map, free)         hashtable_free(map)
 #  define MAP_CONTAINS(map, key)      hashtable_containsKey(map, (void*)(key))
 #  define MAP_FIND(map, key)          hashtable_find(map, (void*)(key))
 #  define MAP_INSERT(map, key, data)  hashtable_insert(map, (void*)(key), (void*)(data))
 #  define MAP_REMOVE(map, key)        hashtable_remove(map, (void*)(key))
 
 #  define TMMAP_ALLOC(hash, cmp)      TMHASHTABLE_ALLOC(1, hash, cmp, 2, 2)
-#  define TMMAP_FREE(map)             TMHASHTABLE_FREE(map)
+#  define TMMAP_FREE(map, free)       TMHASHTABLE_FREE(map)
 #  define TMMAP_CONTAINS(map, key)    TMHASHTABLE_CONTAINS(map, (void*)(key))
 #  define TMMAP_FIND(map, key)        TMHASHTABLE_FIND(map, (void*)(key))
 #  define TMMAP_INSERT(map, key, data) \
@@ -105,7 +105,7 @@
 
 #  define MAP_T                       jsw_atree_t
 #  define MAP_ALLOC(hash, cmp)        jsw_anew((cmp_f)cmp)
-#  define MAP_FREE(map)               jsw_adelete(map)
+#  define MAP_FREE(map, free)         jsw_adelete(map, free)
 #  define MAP_CONTAINS(map, key) \
     ({ \
         bool_t success = FALSE; \
@@ -157,7 +157,7 @@
 
 #  define MAP_T                       jsw_avltree_t
 #  define MAP_ALLOC(hash, cmp)        jsw_avlnew((cmp_f)cmp)
-#  define MAP_FREE(map)               jsw_avldelete(map)
+#  define MAP_FREE(map, free)         jsw_avldelete(map, free)
 #  define MAP_CONTAINS(map, key) \
     ({ \
         bool_t success = FALSE; \
@@ -204,7 +204,7 @@
      })
 
 #  define PMAP_ALLOC(hash, cmp)        Pjsw_avlnew((cmp_f)cmp)
-#  define PMAP_FREE(map)               Pjsw_avldelete(map)
+#  define PMAP_FREE(map, free)         Pjsw_avldelete(map, free)
 #  define PMAP_INSERT(map, key, data) \
     ({ \
         bool_t success = FALSE; \
@@ -228,7 +228,52 @@
         } \
         success; \
      })
-
+#  define TMMAP_ALLOC(hash, cmp)        TMjsw_avlnew((cmp_f)cmp)
+#  define TMMAP_FREE(map, free)         TMjsw_avldelete(map, free)
+#  define TMMAP_CONTAINS(map, key) \
+    ({ \
+        bool_t success = FALSE; \
+        pair_t searchPair; \
+        searchPair.firstPtr = (void*)key; \
+        if (jsw_avlfind(map, (void*)&searchPair) != NULL) { \
+            success = TRUE; \
+        } \
+        success; \
+     })
+#  define TMMAP_FIND(map, key) \
+    ({ \
+        void* dataPtr = NULL; \
+        pair_t searchPair; \
+        searchPair.firstPtr = (void*)(key); \
+        pair_t* pairPtr = (pair_t*)jsw_avlfind(map, (void*)&searchPair); \
+        if (pairPtr != NULL) { \
+            dataPtr = pairPtr->secondPtr; \
+        } \
+        dataPtr; \
+     })
+#  define TMMAP_INSERT(map, key, data) \
+    ({ \
+        bool_t success = FALSE; \
+        pair_t* insertPtr = TMPAIR_ALLOC((void*)(key), (void*)data); \
+        if (insertPtr != NULL) { \
+            if (TMjsw_avlinsert(map, (void*)insertPtr)) { \
+                success = TRUE; \
+            } \
+        } \
+        success; \
+     })
+#  define TMMAP_REMOVE(map, key) \
+    ({ \
+        bool_t success = FALSE; \
+        pair_t searchPair; \
+        searchPair.firstPtr = (void*)(key); \
+        pair_t* pairPtr = (pair_t*)jsw_avlfind(map, (void*)&searchPair); \
+        if (TMjsw_avlerase(map, (void*)&searchPair)) { \
+            TMPAIR_FREE(pairPtr); \
+            success = TRUE; \
+        } \
+        success; \
+     })
 
 #elif defined(MAP_USE_RBTREE)
 
@@ -236,7 +281,7 @@
 
 #  define MAP_T                       rbtree_t
 #  define MAP_ALLOC(hash, cmp)        rbtree_alloc(cmp)
-#  define MAP_FREE(map)               rbtree_free(map)
+#  define MAP_FREE(map, free)         rbtree_free(map, free)
 
 #  define MAP_CONTAINS(map, key)      rbtree_contains(map, (void*)(key))
 #  define MAP_FIND(map, key)          rbtree_get(map, (void*)(key))
@@ -262,7 +307,7 @@
 
 #  define MAP_T                       jsw_skip_t
 #  define MAP_ALLOC(hash, cmp)        jsw_snew(SKIPLIST_MAX_HEIGHT, (cmp_f)cmp)
-#  define MAP_FREE(map)               jsw_sdelete(map)
+#  define MAP_FREE(map, free)         jsw_sdelete(map, free)
 #  define MAP_CONTAINS(map, key) \
     ({ \
         bool_t success = FALSE; \

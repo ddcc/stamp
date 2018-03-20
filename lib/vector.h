@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -108,6 +108,15 @@ Pvector_alloc (long initCapacity);
 
 
 /* =============================================================================
+ * TMvector_alloc
+ * -- Returns NULL if failed
+ * =============================================================================
+ */
+vector_t*
+TMvector_alloc (long initCapacity);
+
+
+/* =============================================================================
  * vector_free
  * =============================================================================
  */
@@ -148,6 +157,15 @@ vector_pushBack (vector_t* vectorPtr, void* dataPtr);
  */
 bool_t
 Pvector_pushBack (vector_t* vectorPtr, void* dataPtr);
+
+
+/* =============================================================================
+ * TMvector_pushBack
+ * -- Returns FALSE if fail, else TRUE
+ * =============================================================================
+ */
+bool_t
+TMvector_pushBack (vector_t* vectorPtr, void* dataPtr);
 
 
 /* =============================================================================
@@ -200,7 +218,7 @@ Pvector_copy (vector_t* dstVectorPtr, vector_t* srcVectorPtr);
 
 
 #define PVECTOR_ALLOC(n)            Pvector_alloc(n)
-#define PVECTOR_FREE(v)             Pvector_free(v)
+#define PVECTOR_FREE                Pvector_free
 #define PVECTOR_PUSHBACK(v, data)   Pvector_pushBack(v, data)
 #define PVECTOR_POPBACK(v)          vector_popBack(v)
 #define PVECTOR_AT(v, i)            vector_at(v, i)
@@ -209,6 +227,8 @@ Pvector_copy (vector_t* dstVectorPtr, vector_t* srcVectorPtr);
 #define PVECTOR_SORT(v, cmp)        vector_sort(v, cmp)
 #define PVECTOR_COPY(dst, src)      Pvector_copy(dst, src)
 
+#define TMVECTOR_ALLOC(n)           TMvector_alloc(n)
+#define TMVECTOR_PUSHBACK(v, data)  TMvector_pushBack(v, data)
 
 #ifdef __cplusplus
 }

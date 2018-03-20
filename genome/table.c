@@ -172,15 +172,12 @@ table_remove (table_t* tablePtr, ulong_t hash, void* dataPtr)
 void
 table_free (table_t* tablePtr)
 {
-#if 0
-   /* TODO: fix mixed sequential/parallel allocation */
     long i;
 
     for (i = 0; i < tablePtr->numBucket; i++) {
-        list_free(tablePtr->buckets[i]);
+        list_free(tablePtr->buckets[i], NULL);
     }
-#endif
-
+    free(tablePtr->buckets);
     free(tablePtr);
 }
 

@@ -125,7 +125,7 @@ TMrbtree_alloc (TM_ARGDECL  long (*compare)(const void*, const void*));
  * =============================================================================
  */
 void
-rbtree_free (rbtree_t* r);
+rbtree_free (rbtree_t* r,  void (*freeData)(void *, void *));
 
 
 /* =============================================================================
@@ -133,7 +133,7 @@ rbtree_free (rbtree_t* r);
  * =============================================================================
  */
 void
-TMrbtree_free (TM_ARGDECL  rbtree_t* r);
+TMrbtree_free (TM_ARGDECL  rbtree_t* r, void (*TMfreeData)(void *, void *));
 
 
 /* =============================================================================
@@ -226,7 +226,7 @@ TMrbtree_contains (TM_ARGDECL  rbtree_t* r, void* key);
 
 
 #define TMRBTREE_ALLOC(cmp)       TMrbtree_alloc(TM_ARG  cmp)
-#define TMRBTREE_FREE(r)          TMrbtree_free(TM_ARG  r)
+#define TMRBTREE_FREE(r, free)    TMrbtree_free(TM_ARG  r, free)
 #define TMRBTREE_INSERT(r, k, v)  TMrbtree_insert(TM_ARG  r, (void*)(k), (void*)(v))
 #define TMRBTREE_DELETE(r, k)     TMrbtree_delete(TM_ARG  r, (void*)(k))
 #define TMRBTREE_UPDATE(r, k, v)  TMrbtree_update(TM_ARG  r, (void*)(k), (void*)(v))

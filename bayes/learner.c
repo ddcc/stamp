@@ -258,7 +258,7 @@ learner_alloc (data_t* dataPtr, adtree_t* adtreePtr, long numThread)
 void
 learner_free (learner_t* learnerPtr)
 {
-    list_free(learnerPtr->taskListPtr);
+    list_free(learnerPtr->taskListPtr, NULL);
     free(learnerPtr->tasks);
     free(learnerPtr->localBaseLogLikelihoods);
     net_free(learnerPtr->netPtr);

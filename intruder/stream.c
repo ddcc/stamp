@@ -136,7 +136,7 @@ stream_free (stream_t* streamPtr)
         free(str);
     }
 
-    MAP_FREE(streamPtr->attackMapPtr);
+    MAP_FREE(streamPtr->attackMapPtr, NULL);
     queue_free(streamPtr->packetQueuePtr);
     vector_free(streamPtr->allocVectorPtr);
     random_free(streamPtr->randomPtr);

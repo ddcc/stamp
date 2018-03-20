@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -361,7 +361,9 @@ checkTables (manager_t* managerPtr)
     long queryRange = (long)((double)percentQuery / 100.0 * (double)numRelation + 0.5);
     long maxCustomerId = queryRange + 1;
     for (i = 1; i <= maxCustomerId; i++) {
-        if (MAP_FIND(customerTablePtr, i)) {
+        customer_t *c;
+        if ((c = MAP_FIND(customerTablePtr, i))) {
+            customer_free_seq(c);
             if (MAP_REMOVE(customerTablePtr, i)) {
                 assert(!MAP_FIND(customerTablePtr, i));
             }
@@ -372,8 +374,10 @@ checkTables (manager_t* managerPtr)
     for (t = 0; t < numTable; t++) {
         MAP_T* tablePtr = tables[t];
         for (i = 1; i <= numRelation; i++) {
-            if (MAP_FIND(tablePtr, i)) {
+            reservation_t *r;
+            if ((r = MAP_FIND(tablePtr, i))) {
                 assert(manager_add[t](managerPtr, i, 0, 0)); /* validate entry */
+                reservation_free_seq(r);
                 if (MAP_REMOVE(tablePtr, i)) {
                     assert(!MAP_REMOVE(tablePtr, i));
                 }
@@ -400,6 +404,7 @@ freeClients (client_t** clients)
         client_t* clientPtr = clients[i];
         client_free(clientPtr);
     }
+    free(clients);
 }
 
 
@@ -453,9 +458,6 @@ MAIN(argc, argv)
     printf("Deallocating memory... ");
     fflush(stdout);
     freeClients(clients);
-    /*
-     * TODO: The contents of the manager's table need to be deallocated.
-     */
     manager_free(managerPtr);
     puts("done.");
     fflush(stdout);

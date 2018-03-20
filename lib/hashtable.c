@@ -258,7 +258,7 @@ allocBuckets (long numBucket, long (*comparePairs)(const pair_t*, const pair_t*)
             list_alloc((long (*)(const void*, const void*))comparePairs);
         if (chainPtr == NULL) {
             while (--i >= 0) {
-                list_free(buckets[i]);
+                list_free(buckets[i], (void (*)(void *))pair_free);
             }
             return NULL;
         }
@@ -292,7 +292,7 @@ TMallocBuckets (TM_ARGDECL
             TMLIST_ALLOC((long (*)(const void*, const void*))comparePairs);
         if (chainPtr == NULL) {
             while (--i >= 0) {
-                TMLIST_FREE(buckets[i]);
+                TMLIST_FREE(buckets[i], (void (*)(void *))TMPAIR_FREE);
             }
             return NULL;
         }
@@ -395,8 +395,8 @@ freeBuckets (list_t** buckets, long numBucket)
 {
     long i;
 
-    for (i = 0; i < numBucket; i++) {
-        list_free(buckets[i]);
+    for (i = 0; i < numBucket + 1; i++) {
+        list_free(buckets[i], (void (*)(void *))pair_free);
     }
 
     free(buckets);
@@ -413,7 +413,7 @@ TMfreeBuckets (TM_ARGDECL  list_t** buckets, long numBucket)
     long i;
 
     for (i = 0; i < numBucket; i++) {
-        TMLIST_FREE( buckets[i]);
+        TMLIST_FREE(buckets[i], (void (*)(void *))TMPAIR_FREE);
     }
 
     TM_FREE(buckets);

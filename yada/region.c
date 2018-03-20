@@ -122,9 +122,13 @@ Pregion_alloc ()
 void
 Pregion_free (region_t* regionPtr)
 {
+    for (size_t i = 0; i < PVECTOR_GETSIZE(regionPtr->badVectorPtr); ++i) {
+        element_t* badElementPtr = (element_t*)vector_at(regionPtr->badVectorPtr, i);
+        PELEMENT_FREE(badElementPtr);
+    }
     PVECTOR_FREE(regionPtr->badVectorPtr);
-    PLIST_FREE(regionPtr->borderListPtr);
-    PLIST_FREE(regionPtr->beforeListPtr);
+    PLIST_FREE(regionPtr->borderListPtr, NULL);
+    PLIST_FREE(regionPtr->beforeListPtr, NULL);
     PQUEUE_FREE(regionPtr->expandQueuePtr);
     P_FREE(regionPtr);
 }
@@ -260,8 +264,8 @@ TMgrowRegion (TM_ARGDECL
     list_t* borderListPtr = regionPtr->borderListPtr;
     queue_t* expandQueuePtr = regionPtr->expandQueuePtr;
 
-    PLIST_CLEAR(beforeListPtr);
-    PLIST_CLEAR(borderListPtr);
+    PLIST_CLEAR(beforeListPtr, NULL);
+    PLIST_CLEAR(borderListPtr, NULL);
     PQUEUE_CLEAR(expandQueuePtr);
 
     coordinate_t centerCoordinate = element_getNewPoint(centerElementPtr);
@@ -303,8 +307,8 @@ TMgrowRegion (TM_ARGDECL
                     }
                     PLIST_INSERT(borderListPtr,
                                  (void*)borderEdgePtr); /* no duplicates */
-                    if (!MAP_CONTAINS(edgeMapPtr, borderEdgePtr)) {
-                        PMAP_INSERT(edgeMapPtr, borderEdgePtr, neighborElementPtr);
+                    if (!TMMAP_CONTAINS(edgeMapPtr, borderEdgePtr)) {
+                        TMMAP_INSERT(edgeMapPtr, borderEdgePtr, neighborElementPtr);
                     }
                 }
             } /* not visited before */
@@ -333,7 +337,7 @@ TMregion_refine (TM_ARGDECL
     TMELEMENT_ISGARBAGE(elementPtr); /* so we can detect conflicts */
 
     while (1) {
-        edgeMapPtr = PMAP_ALLOC(NULL, &element_mapCompareEdge);
+        edgeMapPtr = TMMAP_ALLOC(NULL, &element_mapCompareEdge);
         assert(edgeMapPtr);
         encroachElementPtr = TMgrowRegion(TM_ARG
                                           elementPtr,
@@ -353,7 +357,7 @@ TMregion_refine (TM_ARGDECL
         } else {
             break;
         }
-        PMAP_FREE(edgeMapPtr);
+        TMMAP_FREE(edgeMapPtr, NULL);
     }
 
     /*
@@ -368,7 +372,7 @@ TMregion_refine (TM_ARGDECL
                                     edgeMapPtr);
     }
 
-    PMAP_FREE(edgeMapPtr); /* no need to free elements */
+    TMMAP_FREE(edgeMapPtr, NULL); /* no need to free elements */
 
     return numDelta;
 }

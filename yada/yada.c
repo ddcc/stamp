@@ -219,7 +219,7 @@ process ()
             /*
              * Handle delayed deallocation
              */
-            PELEMENT_FREE(elementPtr);
+            // PELEMENT_FREE(elementPtr);
             continue;
         }
 
@@ -238,7 +238,7 @@ process ()
             /*
              * Handle delayed deallocation
              */
-            PELEMENT_FREE(elementPtr);
+            // PELEMENT_FREE(elementPtr);
         }
 
         totalNumAdded += numAdded;
@@ -341,9 +341,8 @@ MAIN(argc, argv)
     fflush(stdout);
     assert(isSuccess);
 
-    /*
-     * TODO: deallocate mesh and work heap
-     */
+    mesh_free(global_meshPtr);
+    heap_free(global_workHeapPtr);
 
     TM_SHUTDOWN();
     P_MEMORY_SHUTDOWN();

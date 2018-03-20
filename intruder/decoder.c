@@ -121,7 +121,7 @@ void
 decoder_free (decoder_t* decoderPtr)
 {
     queue_free(decoderPtr->decodedQueuePtr);
-    MAP_FREE(decoderPtr->fragmentedMapPtr);
+    MAP_FREE(decoderPtr->fragmentedMapPtr, NULL);
     free(decoderPtr);
 }
 
@@ -253,7 +253,7 @@ decoder_process (decoder_t* decoderPtr, char* bytes, long numByte)
                 status = queue_push(decodedQueuePtr, (void*)decodedPtr);
                 assert(status);
 
-                list_free(fragmentListPtr);
+                list_free(fragmentListPtr, NULL);
                 status = MAP_REMOVE(fragmentedMapPtr, (void*)flowId);
                 assert(status);
             }
@@ -417,7 +417,7 @@ TMdecoder_process (TM_ARGDECL  decoder_t* decoderPtr, char* bytes, long numByte)
                 status = TMQUEUE_PUSH(decodedQueuePtr, (void*)decodedPtr);
                 assert(status);
 
-                TMLIST_FREE(fragmentListPtr);
+                TMLIST_FREE(fragmentListPtr, NULL);
                 status = TMMAP_REMOVE(fragmentedMapPtr, (void*)flowId);
                 assert(status);
             }

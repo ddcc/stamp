@@ -12,48 +12,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -85,16 +85,18 @@
  * =============================================================================
  */
 
+static void (*freeData)(void *);
+
 TM_CALLABLE
-static long 
+static long
 queryNumFree (TM_ARGDECL  MAP_T* tablePtr, long id);
 
 TM_CALLABLE
-static long 
+static long
 queryPrice (TM_ARGDECL  MAP_T* tablePtr, long id);
 
 TM_CALLABLE
-static bool_t 
+static bool_t
 reserve (TM_ARGDECL MAP_T* tablePtr, MAP_T* customerTablePtr, long customerId, long id, reservation_type_t type);
 
 TM_CALLABLE
@@ -140,13 +142,13 @@ manager_alloc ()
 
 /* =============================================================================
  * tableFree
- * -- Note: contents are not deallocated
  * =============================================================================
  */
 static void
-tableFree (MAP_T* mapPtr)
+tableFree (void *k, void *v)
 {
-    MAP_FREE(mapPtr);
+    if (freeData && v)
+        freeData(v);
 }
 
 
@@ -158,10 +160,16 @@ tableFree (MAP_T* mapPtr)
 void
 manager_free (manager_t* managerPtr)
 {
-    tableFree(managerPtr->carTablePtr);
-    tableFree(managerPtr->roomTablePtr);
-    tableFree(managerPtr->flightTablePtr);
-    tableFree(managerPtr->customerTablePtr);
+    freeData = (void (*)(void *))reservation_free_seq;
+    MAP_FREE(managerPtr->carTablePtr, tableFree);
+    freeData = (void (*)(void *))reservation_free_seq;
+    MAP_FREE(managerPtr->roomTablePtr, tableFree);
+    freeData = (void (*)(void *))reservation_free_seq;
+    MAP_FREE(managerPtr->flightTablePtr, tableFree);
+    freeData = (void (*)(void *))customer_free_seq;
+    MAP_FREE(managerPtr->customerTablePtr, tableFree);
+
+    free(managerPtr);
 }
 
 
