@@ -58,48 +58,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -236,7 +236,7 @@ learner_alloc (data_t* dataPtr, adtree_t* adtreePtr, long numThread)
         learnerPtr->netPtr = net_alloc(dataPtr->numVar);
         assert(learnerPtr->netPtr);
         learnerPtr->localBaseLogLikelihoods =
-            (float*)malloc(dataPtr->numVar * sizeof(float));
+            (padded_float_t*)malloc(dataPtr->numVar * sizeof(padded_float_t));
         assert(learnerPtr->localBaseLogLikelihoods);
         learnerPtr->baseLogLikelihood = 0.0F;
         learnerPtr->tasks =
@@ -333,7 +333,7 @@ createTaskList (void* argPtr)
     bool_t status;
 
     adtree_t* adtreePtr = learnerPtr->adtreePtr;
-    float* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
+    padded_float_t* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
     learner_task_t* tasks = learnerPtr->tasks;
 
     query_t queries[2];
@@ -378,7 +378,7 @@ createTaskList (void* argPtr)
                                               queryVectorPtr,
                                               parentQueryVectorPtr);
 
-        localBaseLogLikelihoods[v] = localBaseLogLikelihood;
+        localBaseLogLikelihoods[v].f = localBaseLogLikelihood;
         baseLogLikelihood += localBaseLogLikelihood;
 
     } /* foreach variable */
@@ -405,7 +405,7 @@ createTaskList (void* argPtr)
 
         queries[0].index = v;
         long bestLocalIndex = v;
-        float bestLocalLogLikelihood = localBaseLogLikelihoods[v];
+        float bestLocalLogLikelihood = localBaseLogLikelihoods[v].f;
 
         status = PVECTOR_PUSHBACK(queryVectorPtr, (void*)&queries[1]);
         assert(status);
@@ -471,7 +471,7 @@ createTaskList (void* argPtr)
         if (bestLocalIndex != v) {
             float logLikelihood = numRecord * (baseLogLikelihood +
                                                 + bestLocalLogLikelihood
-                                                - localBaseLogLikelihoods[v]);
+                                                - localBaseLogLikelihoods[v].f);
             float score = penalty + logLikelihood;
             learner_task_t* taskPtr = &tasks[v];
             taskPtr->op = OPERATION_INSERT;
@@ -730,7 +730,7 @@ TMfindBestInsertTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
     bool_t status;
     adtree_t* adtreePtr               = learnerPtr->adtreePtr;
     net_t*    netPtr                  = learnerPtr->netPtr;
-    float*    localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
+    padded_float_t*    localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
 
     TMpopulateParentQueryVector(TM_ARG  netPtr, toId, queries, parentQueryVectorPtr);
 
@@ -753,7 +753,7 @@ TMfindBestInsertTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
 
     float bestFromId = toId; /* flag for not found */
     float oldLocalLogLikelihood =
-        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId]);
+        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId].f);
     float bestLocalLogLikelihood = oldLocalLogLikelihood;
 
     status = TMNET_FINDDESCENDANTS(netPtr, toId, invalidBitmapPtr, workQueuePtr);
@@ -857,7 +857,7 @@ TMfindBestRemoveTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
     bool_t status;
     adtree_t* adtreePtr = learnerPtr->adtreePtr;
     net_t* netPtr = learnerPtr->netPtr;
-    float* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
+    padded_float_t* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
 
     TMpopulateParentQueryVector(TM_ARG
                                 netPtr, toId, queries, origParentQueryVectorPtr);
@@ -869,7 +869,7 @@ TMfindBestRemoveTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
 
     float bestFromId = toId; /* flag for not found */
     float oldLocalLogLikelihood =
-        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId]);
+        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId].f);
     float bestLocalLogLikelihood = oldLocalLogLikelihood;
 
     long i;
@@ -972,7 +972,7 @@ TMfindBestReverseTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
     bool_t status;
     adtree_t* adtreePtr = learnerPtr->adtreePtr;
     net_t* netPtr = learnerPtr->netPtr;
-    float* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
+    padded_float_t* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
 
     TMpopulateParentQueryVector(TM_ARG
                                 netPtr, toId, queries, toOrigParentQueryVectorPtr);
@@ -984,7 +984,7 @@ TMfindBestReverseTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
 
     long bestFromId = toId; /* flag for not found */
     float oldLocalLogLikelihood =
-        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId]);
+        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId].f);
     float bestLocalLogLikelihood = oldLocalLogLikelihood;
     long fromId = 0;
 
@@ -996,7 +996,7 @@ TMfindBestReverseTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
 
         bestLocalLogLikelihood =
             oldLocalLogLikelihood +
-            (float)TM_SHARED_READ_F(localBaseLogLikelihoods[fromId]);
+            (float)TM_SHARED_READ_F(localBaseLogLikelihoods[fromId].f);
 
         TMpopulateParentQueryVector(TM_ARG
                                     netPtr,
@@ -1110,7 +1110,7 @@ TMfindBestReverseTask (TM_ARGDECL  findBestTaskArg_t* argPtr)
 
     if (bestFromId != toId) {
         float fromLocalLogLikelihood =
-            (float)TM_SHARED_READ_F(localBaseLogLikelihoods[bestFromId]);
+            (float)TM_SHARED_READ_F(localBaseLogLikelihoods[bestFromId].f);
         long numRecord = adtreePtr->numRecord;
         float penalty = numTotalParent * basePenalty;
         float logLikelihood = numRecord * (baseLogLikelihood +
@@ -1143,7 +1143,7 @@ learnStructure (void* argPtr)
     net_t* netPtr = learnerPtr->netPtr;
     adtree_t* adtreePtr = learnerPtr->adtreePtr;
     long numRecord = adtreePtr->numRecord;
-    float* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
+    padded_float_t* localBaseLogLikelihoods = learnerPtr->localBaseLogLikelihoods;
     list_t* taskListPtr = learnerPtr->taskListPtr;
 
     float operationQualityFactor = global_operationQualityFactor;
@@ -1279,10 +1279,10 @@ learnStructure (void* argPtr)
                                                   queryVectorPtr,
                                                   parentQueryVectorPtr);
                     float toLocalBaseLogLikelihood =
-                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId]);
+                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId].f);
                     deltaLogLikelihood +=
                         toLocalBaseLogLikelihood - newBaseLogLikelihood;
-                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[toId],
+                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[toId].f,
                                       newBaseLogLikelihood);
                     TM_END();
                     TM_BEGIN();
@@ -1308,10 +1308,10 @@ learnStructure (void* argPtr)
                                                   queryVectorPtr,
                                                   parentQueryVectorPtr);
                     float fromLocalBaseLogLikelihood =
-                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[fromId]);
+                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[fromId].f);
                     deltaLogLikelihood +=
                         fromLocalBaseLogLikelihood - newBaseLogLikelihood;
-                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[fromId],
+                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[fromId].f,
                                       newBaseLogLikelihood);
                     TM_END();
                     TM_BEGIN();
@@ -1338,10 +1338,10 @@ learnStructure (void* argPtr)
                                                   queryVectorPtr,
                                                   parentQueryVectorPtr);
                     float fromLocalBaseLogLikelihood =
-                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[fromId]);
+                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[fromId].f);
                     deltaLogLikelihood +=
                         fromLocalBaseLogLikelihood - newBaseLogLikelihood;
-                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[fromId],
+                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[fromId].f,
                                       newBaseLogLikelihood);
                     TM_END();
 
@@ -1360,10 +1360,10 @@ learnStructure (void* argPtr)
                                                   queryVectorPtr,
                                                   parentQueryVectorPtr);
                     float toLocalBaseLogLikelihood =
-                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId]);
+                        (float)TM_SHARED_READ_F(localBaseLogLikelihoods[toId].f);
                     deltaLogLikelihood +=
                         toLocalBaseLogLikelihood - newBaseLogLikelihood;
-                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[toId],
+                    TM_SHARED_WRITE_F(localBaseLogLikelihoods[toId].f,
                                       newBaseLogLikelihood);
                     TM_END();
                     break;
