@@ -431,12 +431,30 @@
                                         }
 #      define TM_SHUTDOWN()             if (getenv("STM_STATS") != NULL) { \
                                           unsigned long u[16]; \
+                                          if (stm_get_global_stats("global_nb_rs_entries", &u[0]) != 0) \
+                                            printf("Read Set: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_rs_entries_aborted", &u[0]) != 0) \
+                                            printf("Read Set Aborted: %lu\n", u[0]); \
                                           if (stm_get_global_stats("global_max_rs_entries", &u[0]) != 0) \
                                             printf("Max Read Set: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_ws_entries", &u[0]) != 0) \
+                                            printf("Write Set: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_ws_entries_aborted", &u[0]) != 0) \
+                                            printf("Write Set Aborted: %lu\n", u[0]); \
                                           if (stm_get_global_stats("global_max_ws_entries", &u[0]) != 0) \
                                             printf("Max Write Set: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_ws_unique_entries", &u[0]) != 0) \
+                                            printf("Write Set Unique: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_ws_unique_entries_aborted", &u[0]) != 0) \
+                                            printf("Write Set Unique Aborted: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_ws_unique_entries_nonempty", &u[0]) != 0) \
+                                            printf("Write Set Unique Nonempty: %lu\n", u[0]); \
                                           if (stm_get_global_stats("global_max_ws_unique_entries", &u[0]) != 0) \
                                             printf("Max Write Set Unique: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_ol_used", &u[0]) != 0) \
+                                            printf("Operation Log: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_ol_used_aborted", &u[0]) != 0) \
+                                            printf("Operation Log Aborted: %lu\n", u[0]); \
                                           if (stm_get_global_stats("global_max_ol_used", &u[0]) != 0) \
                                             printf("Max Operation Log: %lu\n", u[0]); \
                                           if (stm_get_global_stats("global_nb_extensions", &u[0]) != 0) \
@@ -461,6 +479,12 @@
                                             printf("Reads: %lu\n", u[0]); \
                                           if (stm_get_global_stats("global_nb_writes", &u) != 0) \
                                             printf("Writes: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_reverted_reads", &u[0]) != 0) \
+                                            printf("Reads Reverted: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_reverted_writes", &u[0]) != 0) \
+                                            printf("Writes Reverted: %lu\n", u[0]); \
+                                          if (stm_get_global_stats("global_nb_reverted_ops", &u[0]) != 0) \
+                                            printf("Operations Reverted: %lu\n", u[0]); \
                                           if (stm_get_global_stats("global_nb_aborts_reason", &u) != 0) { \
                                             for (unsigned i = 0; i < 16; ++i) { \
                                               switch (i) { \

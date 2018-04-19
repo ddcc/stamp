@@ -507,45 +507,47 @@ fixAfterInsertion (rbtree_t* s, node_t* x)
 {
     STF(x, c, RED);
     while (x != NULL && x != LDNODE(s, root)) {
-        node_t* xp = LDNODE(x, p);
+        node_t* xp = PARENT_OF(x);
         if (LDF(xp, c) != RED) {
             break;
         }
-        /* TODO: cache g = ppx = PARENT_OF(PARENT_OF(x)) */
-        if (PARENT_OF(x) == LEFT_OF(PARENT_OF(PARENT_OF(x)))) {
-            node_t*  y = RIGHT_OF(PARENT_OF(PARENT_OF(x)));
+        node_t *g = PARENT_OF(xp);
+        if (xp == LEFT_OF(g)) {
+            node_t* y = RIGHT_OF(g);
             if (COLOR_OF(y) == RED) {
-                SET_COLOR(PARENT_OF(x), BLACK);
+                SET_COLOR(xp, BLACK);
                 SET_COLOR(y, BLACK);
-                SET_COLOR(PARENT_OF(PARENT_OF(x)), RED);
-                x = PARENT_OF(PARENT_OF(x));
+                SET_COLOR(g, RED);
+                x = g;
             } else {
-                if (x == RIGHT_OF(PARENT_OF(x))) {
-                    x = PARENT_OF(x);
+                if (x == RIGHT_OF(xp)) {
+                    x = xp;
                     ROTATE_LEFT(s, x);
+                    xp = PARENT_OF(x);
                 }
-                SET_COLOR(PARENT_OF(x), BLACK);
-                SET_COLOR(PARENT_OF(PARENT_OF(x)), RED);
-                if (PARENT_OF(PARENT_OF(x)) != NULL) {
-                    ROTATE_RIGHT(s, PARENT_OF(PARENT_OF(x)));
+                SET_COLOR(xp, BLACK);
+                SET_COLOR(g, RED);
+                if (g != NULL) {
+                    ROTATE_RIGHT(s, g);
                 }
             }
         } else {
-            node_t* y = LEFT_OF(PARENT_OF(PARENT_OF(x)));
+            node_t* y = LEFT_OF(g);
             if (COLOR_OF(y) == RED) {
-                SET_COLOR(PARENT_OF(x), BLACK);
+                SET_COLOR(xp, BLACK);
                 SET_COLOR(y, BLACK);
-                SET_COLOR(PARENT_OF(PARENT_OF(x)), RED);
-                x = PARENT_OF(PARENT_OF(x));
+                SET_COLOR(g, RED);
+                x = g;
             } else {
-                if (x == LEFT_OF(PARENT_OF(x))) {
-                    x = PARENT_OF(x);
+                if (x == LEFT_OF(xp)) {
+                    x = xp;
                     ROTATE_RIGHT(s, x);
+                    xp = PARENT_OF(x);
                 }
-                SET_COLOR(PARENT_OF(x),  BLACK);
-                SET_COLOR(PARENT_OF(PARENT_OF(x)), RED);
-                if (PARENT_OF(PARENT_OF(x)) != NULL) {
-                    ROTATE_LEFT(s, PARENT_OF(PARENT_OF(x)));
+                SET_COLOR(xp, BLACK);
+                SET_COLOR(g, RED);
+                if (g != NULL) {
+                    ROTATE_LEFT(s, g);
                 }
             }
         }
@@ -567,45 +569,47 @@ TMfixAfterInsertion (TM_ARGDECL  rbtree_t* s, node_t* x)
 {
     TX_STF(x, c, RED);
     while (x != NULL && x != TX_LDNODE(s, root)) {
-        node_t* xp = TX_LDNODE(x, p);
+        node_t* xp = TX_PARENT_OF(x);
         if (TX_LDF(xp, c) != RED) {
             break;
         }
-        /* TODO: cache g = ppx = TX_PARENT_OF(TX_PARENT_OF(x)) */
-        if (TX_PARENT_OF(x) == TX_LEFT_OF(TX_PARENT_OF(TX_PARENT_OF(x)))) {
-            node_t*  y = TX_RIGHT_OF(TX_PARENT_OF(TX_PARENT_OF(x)));
+        node_t *g = TX_PARENT_OF(xp);
+        if (xp == TX_LEFT_OF(g)) {
+            node_t* y = TX_RIGHT_OF(g);
             if (TX_COLOR_OF(y) == RED) {
-                TX_SET_COLOR(TX_PARENT_OF(x), BLACK);
+                TX_SET_COLOR(xp, BLACK);
                 TX_SET_COLOR(y, BLACK);
-                TX_SET_COLOR(TX_PARENT_OF(TX_PARENT_OF(x)), RED);
-                x = TX_PARENT_OF(TX_PARENT_OF(x));
+                TX_SET_COLOR(g, RED);
+                x = g;
             } else {
-                if (x == TX_RIGHT_OF(TX_PARENT_OF(x))) {
-                    x = TX_PARENT_OF(x);
+                if (x == TX_RIGHT_OF(xp)) {
+                    x = xp;
                     TX_ROTATE_LEFT(s, x);
+                    xp = TX_PARENT_OF(x);
                 }
-                TX_SET_COLOR(TX_PARENT_OF(x), BLACK);
-                TX_SET_COLOR(TX_PARENT_OF(TX_PARENT_OF(x)), RED);
-                if (TX_PARENT_OF(TX_PARENT_OF(x)) != NULL) {
-                    TX_ROTATE_RIGHT(s, TX_PARENT_OF(TX_PARENT_OF(x)));
+                TX_SET_COLOR(xp, BLACK);
+                TX_SET_COLOR(g, RED);
+                if (g != NULL) {
+                    TX_ROTATE_RIGHT(s, g);
                 }
             }
         } else {
-            node_t* y = TX_LEFT_OF(TX_PARENT_OF(TX_PARENT_OF(x)));
+            node_t* y = TX_LEFT_OF(g);
             if (TX_COLOR_OF(y) == RED) {
-                TX_SET_COLOR(TX_PARENT_OF(x), BLACK);
+                TX_SET_COLOR(xp, BLACK);
                 TX_SET_COLOR(y, BLACK);
-                TX_SET_COLOR(TX_PARENT_OF(TX_PARENT_OF(x)), RED);
-                x = TX_PARENT_OF(TX_PARENT_OF(x));
+                TX_SET_COLOR(g, RED);
+                x = g;
             } else {
-                if (x == TX_LEFT_OF(TX_PARENT_OF(x))) {
-                    x = TX_PARENT_OF(x);
+                if (x == TX_LEFT_OF(xp)) {
+                    x = xp;
                     TX_ROTATE_RIGHT(s, x);
+                    xp = TX_PARENT_OF(x);
                 }
-                TX_SET_COLOR(TX_PARENT_OF(x),  BLACK);
-                TX_SET_COLOR(TX_PARENT_OF(TX_PARENT_OF(x)), RED);
-                if (TX_PARENT_OF(TX_PARENT_OF(x)) != NULL) {
-                    TX_ROTATE_LEFT(s, TX_PARENT_OF(TX_PARENT_OF(x)));
+                TX_SET_COLOR(xp, BLACK);
+                TX_SET_COLOR(g, RED);
+                if (g != NULL) {
+                    TX_ROTATE_LEFT(s, g);
                 }
             }
         }
@@ -966,12 +970,11 @@ delete_node (rbtree_t* s, node_t* p)
     /* Start fixup at replacement node, if it exists */
     node_t* replacement =
         ((LDNODE(p, l) != NULL) ? LDNODE(p, l) : LDNODE(p, r));
+    node_t* pp = LDNODE(p, p);
 
     if (replacement != NULL) {
         /* Link replacement to parent */
-        /* TODO: precompute pp = p->p and substitute below ... */
-        STF (replacement, p, LDNODE(p, p));
-        node_t* pp = LDNODE(p, p);
+        STF (replacement, p, pp);
         if (pp == NULL) {
             STF(s, root, replacement);
         } else if (p == LDNODE(pp, l)) {
@@ -986,19 +989,18 @@ delete_node (rbtree_t* s, node_t* p)
         STF(p, p, NULL);
 
         /* Fix replacement */
-        if (LDF(p,c) == BLACK) {
+        if (LDF(p, c) == BLACK) {
             FIX_AFTER_DELETION(s, replacement);
         }
-    } else if (LDNODE(p, p) == NULL) { /* return if we are the only node */
+    } else if (pp == NULL) { /* return if we are the only node */
         STF(s, root, NULL);
     } else { /* No children. Use self as phantom replacement and unlink */
         if (LDF(p, c) == BLACK) {
             FIX_AFTER_DELETION(s, p);
         }
-        node_t* pp = LDNODE(p, p);
         if (pp != NULL) {
             if (p == LDNODE(pp, l)) {
-                STF(pp,l, NULL);
+                STF(pp, l, NULL);
             } else if (p == LDNODE(pp, r)) {
                 STF(pp, r, NULL);
             }
@@ -1031,12 +1033,11 @@ TMdelete (TM_ARGDECL  rbtree_t* s, node_t* p)
     /* Start fixup at replacement node, if it exists */
     node_t* replacement =
         ((TX_LDNODE(p, l) != NULL) ? TX_LDNODE(p, l) : TX_LDNODE(p, r));
+    node_t* pp = TX_LDNODE(p, p);
 
     if (replacement != NULL) {
         /* Link replacement to parent */
-        /* TODO: precompute pp = p->p and substitute below ... */
-        TX_STF_P(replacement, p, TX_LDNODE(p, p));
-        node_t* pp = TX_LDNODE(p, p);
+        TX_STF_P(replacement, p, pp);
         if (pp == NULL) {
             TX_STF_P(s, root, replacement);
         } else if (p == TX_LDNODE(pp, l)) {
@@ -1051,19 +1052,18 @@ TMdelete (TM_ARGDECL  rbtree_t* s, node_t* p)
         TX_STF_P(p, p, (node_t*)NULL);
 
         /* Fix replacement */
-        if (TX_LDF(p,c) == BLACK) {
+        if (TX_LDF(p, c) == BLACK) {
             TX_FIX_AFTER_DELETION(s, replacement);
         }
-    } else if (TX_LDNODE(p,p) == NULL) { /* return if we are the only node */
+    } else if (pp == NULL) { /* return if we are the only node */
         TX_STF_P(s, root, (node_t*)NULL);
     } else { /* No children. Use self as phantom replacement and unlink */
-        if (TX_LDF(p,c) == BLACK) {
+        if (TX_LDF(p, c) == BLACK) {
             TX_FIX_AFTER_DELETION(s, p);
         }
-        node_t* pp = TX_LDNODE(p, p);
         if (pp != NULL) {
             if (p == TX_LDNODE(pp, l)) {
-                TX_STF_P(pp,l, (node_t*)NULL);
+                TX_STF_P(pp, l, (node_t*)NULL);
             } else if (p == TX_LDNODE(pp, r)) {
                 TX_STF_P(pp, r, (node_t*)NULL);
             }
