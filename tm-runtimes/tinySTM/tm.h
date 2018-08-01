@@ -446,7 +446,7 @@
 #      define P_MALLOC(size)            malloc(size)
 #      define P_FREE(ptr)               free(ptr)
 #      define TM_MALLOC(size)           stm_malloc(size)
-#      define TM_FREE(ptr)              stm_free(ptr, sizeof(stm_word_t))
+#      define TM_FREE(ptr)              stm_free(ptr, sizeof(*ptr))
 
 #    endif /* !OTM */
 
