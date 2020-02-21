@@ -12,48 +12,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -76,6 +76,11 @@
 #include "table.h"
 #include "types.h"
 
+#if !defined(ORIGINAL) && defined(MERGE_TABLE)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "table.inc"
+# undef TM_LOG_OP
+#endif /* !ORIGINAL && MERGE_TABLE */
 
 /* =============================================================================
  * table_alloc
@@ -130,20 +135,50 @@ table_insert (table_t* tablePtr, ulong_t hash, void* dataPtr)
 
 
 /* =============================================================================
- * TMtable_insert
+ * HTMtable_insert
  * -- Returns TRUE if successful, else FALSE
  * =============================================================================
  */
 bool_t
-TMtable_insert (TM_ARGDECL  table_t* tablePtr, ulong_t hash, void* dataPtr)
+HTMtable_insert (table_t* tablePtr, ulong_t hash, void* dataPtr)
 {
     long i = hash % tablePtr->numBucket;
 
-    if (!TMLIST_INSERT(tablePtr->buckets[i], dataPtr)) {
+    if (!HTMLIST_INSERT(tablePtr->buckets[i], dataPtr)) {
         return FALSE;
     }
 
     return TRUE;
+}
+
+
+/* =============================================================================
+ * TMtable_insert
+ * -- Returns TRUE if successful, else FALSE
+ * =============================================================================
+ */
+TM_CALLABLE
+bool_t
+TMtable_insert (TM_ARGDECL  table_t* tablePtr, ulong_t hash, void* dataPtr)
+{
+    long i = hash % tablePtr->numBucket;
+    bool_t rv;
+
+#if !defined(ORIGINAL) && defined(MERGE_TABLE)
+    TM_LOG_BEGIN(TABLE_INSERT, NULL, tablePtr, hash, dataPtr);
+#endif /* !ORIGINAL && MERGE_TABLE */
+
+    if (!TMLIST_INSERT(tablePtr->buckets[i], dataPtr)) {
+        rv = FALSE;
+        goto end;
+    }
+
+    rv = TRUE;
+end:
+#if !defined(ORIGINAL) && defined(MERGE_TABLE)
+    TM_LOG_END(TABLE_INSERT, &rv);
+#endif /* !ORIGINAL && MERGE_TABLE */
+    return rv;
 }
 
 
@@ -258,3 +293,13 @@ main ()
  *
  * =============================================================================
  */
+
+#if !defined(ORIGINAL) && defined(MERGE_TABLE)
+__attribute__((constructor)) void table_init() {
+    TM_LOG_FFI_DECLARE;
+    TM_LOG_TYPE_DECLARE_INIT(*plp[], {&ffi_type_pointer, &ffi_type_ulong, &ffi_type_pointer});
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "table.inc"
+    #undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_TABLE */

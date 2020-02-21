@@ -23,48 +23,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -107,8 +107,8 @@ typedef struct hashtable {
 #ifdef HASHTABLE_SIZE_FIELD
     long size;
 #endif
-    ulong_t (*hash)(const void*);
-    long (*comparePairs)(const pair_t*, const pair_t*);
+    TM_PURE ulong_t (*hash)(const void*);
+    TM_PURE long (*comparePairs)(const pair_t*, const pair_t*);
     long resizeRatio;
     long growthFactor;
     /* comparePairs should return <0 if before, 0 if equal, >0 if after */
@@ -133,6 +133,7 @@ hashtable_iter_reset (hashtable_iter_t* itPtr, hashtable_t* hashtablePtr);
  * TMhashtable_iter_reset
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMhashtable_iter_reset (TM_ARGDECL
                         hashtable_iter_t* itPtr, hashtable_t* hashtablePtr);
@@ -150,6 +151,7 @@ hashtable_iter_hasNext (hashtable_iter_t* itPtr, hashtable_t* hashtablePtr);
  * TMhashtable_iter_hasNext
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_iter_hasNext (TM_ARGDECL
                           hashtable_iter_t* itPtr, hashtable_t* hashtablePtr);
@@ -167,6 +169,7 @@ hashtable_iter_next (hashtable_iter_t* itPtr, hashtable_t* hashtablePtr);
  * TMhashtable_iter_next
  * =============================================================================
  */
+TM_CALLABLE
 void*
 TMhashtable_iter_next (TM_ARGDECL
                        hashtable_iter_t* itPtr, hashtable_t* hashtablePtr);
@@ -192,6 +195,7 @@ hashtable_alloc (long initNumBucket,
  * -- Negative values for resizeRatio or growthFactor select default values
  * =============================================================================
  */
+TM_CALLABLE
 hashtable_t*
 TMhashtable_alloc (TM_ARGDECL
                    long initNumBucket,
@@ -213,6 +217,7 @@ hashtable_free (hashtable_t* hashtablePtr);
  * TMhashtable_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMhashtable_free (TM_ARGDECL  hashtable_t* hashtablePtr);
 
@@ -229,6 +234,7 @@ hashtable_isEmpty (hashtable_t* hashtablePtr);
  * TMhashtable_isEmpty
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_isEmpty (TM_ARGDECL  hashtable_t* hashtablePtr);
 
@@ -247,6 +253,7 @@ hashtable_getSize (hashtable_t* hashtablePtr);
  * -- Returns number of elements in hash table
  * =============================================================================
  */
+TM_CALLABLE
 long
 TMhashtable_getSize (TM_ARGDECL  hashtable_t* hashtablePtr);
 
@@ -263,6 +270,7 @@ hashtable_containsKey (hashtable_t* hashtablePtr, void* keyPtr);
  * TMhashtable_containsKey
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_containsKey (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr);
 
@@ -281,6 +289,8 @@ hashtable_find (hashtable_t* hashtablePtr, void* keyPtr);
  * -- Returns NULL on failure, else pointer to data associated with key
  * =============================================================================
  */
+TM_CALLABLE
+
 void*
 TMhashtable_find (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr);
 
@@ -294,9 +304,18 @@ hashtable_insert (hashtable_t* hashtablePtr, void* keyPtr, void* dataPtr);
 
 
 /* =============================================================================
+ * HTMhashtable_insert
+ * =============================================================================
+ */
+bool_t
+HTMhashtable_insert (hashtable_t* hashtablePtr, void* keyPtr, void* dataPtr);
+
+
+/* =============================================================================
  * TMhashtable_insert
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_insert (TM_ARGDECL
                     hashtable_t* hashtablePtr, void* keyPtr, void* dataPtr);
@@ -316,20 +335,43 @@ hashtable_remove (hashtable_t* hashtablePtr, void* keyPtr);
  * -- Returns TRUE if successful, else FALSE
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_remove (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr);
 
 
-#define TMHASHTABLE_ITER_RESET(it, ht)    TMhashtable_iter_reset(TM_ARG  it, ht)
-#define TMHASHTABLE_ITER_HASNEXT(it, ht)  TMhashtable_iter_hasNext(TM_ARG  it, ht)
-#define TMHASHTABLE_ITER_NEXT(it, ht)     TMhashtable_iter_next(TM_ARG  it, ht)
-#define TMHASHTABLE_ALLOC(i, h, c, r, g)  TMhashtable_alloc(TM_ARG i, h, c, r, g)
-#define TMHASHTABLE_FREE(ht)              TMhashtable_free(TM_ARG  ht)
-#define TMHASHTABLE_ISEMPTY(ht)           TMhashtable_isEmpty(TM_ARG  ht)
-#define TMHASHTABLE_GETSIZE(ht)           TMhashtable_getSize(TM_ARG  ht)
-#define TMHASHTABLE_FIND(ht, k)           TMhashtable_find(TM_ARG  ht, k)
-#define TMHASHTABLE_INSERT(ht, k, d)      TMhashtable_insert(TM_ARG  ht, k, d)
-#define TMHASHTABLE_REMOVE(ht, k)         TMhashtable_remove(TM_ARG  ht, k)
+#define HASHTABLE_ITER_RESET(it, ht)       hashtable_iter_reset(it, ht)
+#define HASHTABLE_ITER_HASNEXT(it, ht)     hashtable_iter_hasNext(it, ht)
+#define HASHTABLE_ITER_NEXT(it, ht)        hashtable_iter_next(it, ht)
+#define HASHTABLE_ALLOC(i, h, c, r, g)     hashtable_alloc(i, h, c, r, g)
+#define HASHTABLE_FREE(ht)                 hashtable_free(ht)
+#define HASHTABLE_ISEMPTY(ht)              hashtable_isEmpty(ht)
+#define HASHTABLE_GETSIZE(ht)              hashtable_getSize(ht)
+#define HASHTABLE_FIND(ht, k)              hashtable_find(ht, k)
+#define HASHTABLE_INSERT(ht, k, d)         hashtable_insert(ht, k, d)
+#define HASHTABLE_REMOVE(ht, k)            hashtable_remove(ht, k)
+
+#define HTMHASHTABLE_ITER_RESET(it, ht)    HTMhashtable_iter_reset(it, ht)
+#define HTMHASHTABLE_ITER_HASNEXT(it, ht)  HTMhashtable_iter_hasNext(it, ht)
+#define HTMHASHTABLE_ITER_NEXT(it, ht)     HTMhashtable_iter_next(it, ht)
+#define HTMHASHTABLE_ALLOC(i, h, c, r, g)  HTMhashtable_alloc(i, h, c, r, g)
+#define HTMHASHTABLE_FREE(ht)              HTMhashtable_free(ht)
+#define HTMHASHTABLE_ISEMPTY(ht)           HTMhashtable_isEmpty(ht)
+#define HTMHASHTABLE_GETSIZE(ht)           HTMhashtable_getSize(ht)
+#define HTMHASHTABLE_FIND(ht, k)           HTMhashtable_find(ht, k)
+#define HTMHASHTABLE_INSERT(ht, k, d)      HTMhashtable_insert(ht, k, d)
+#define HTMHASHTABLE_REMOVE(ht, k)         HTMhashtable_remove(ht, k)
+
+#define TMHASHTABLE_ITER_RESET(it, ht)     TMhashtable_iter_reset(TM_ARG  it, ht)
+#define TMHASHTABLE_ITER_HASNEXT(it, ht)   TMhashtable_iter_hasNext(TM_ARG  it, ht)
+#define TMHASHTABLE_ITER_NEXT(it, ht)      TMhashtable_iter_next(TM_ARG  it, ht)
+#define TMHASHTABLE_ALLOC(i, h, c, r, g)   TMhashtable_alloc(TM_ARG i, h, c, r, g)
+#define TMHASHTABLE_FREE(ht)               TMhashtable_free(TM_ARG  ht)
+#define TMHASHTABLE_ISEMPTY(ht)            TMhashtable_isEmpty(TM_ARG  ht)
+#define TMHASHTABLE_GETSIZE(ht)            TMhashtable_getSize(TM_ARG  ht)
+#define TMHASHTABLE_FIND(ht, k)            TMhashtable_find(TM_ARG  ht, k)
+#define TMHASHTABLE_INSERT(ht, k, d)       TMhashtable_insert(TM_ARG  ht, k, d)
+#define TMHASHTABLE_REMOVE(ht, k)          TMhashtable_remove(TM_ARG  ht, k)
 
 
 #ifdef __cplusplus

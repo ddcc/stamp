@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -86,6 +86,7 @@ typedef struct net net_t;
  * net_alloc
  * =============================================================================
  */
+TM_PURE
 net_t*
 net_alloc (long numNode);
 
@@ -94,6 +95,7 @@ net_alloc (long numNode);
  * net_free
  * =============================================================================
  */
+TM_PURE
 void
 net_free (net_t* netPtr);
 
@@ -102,14 +104,24 @@ net_free (net_t* netPtr);
  * net_applyOperation
  * =============================================================================
  */
+TM_PURE
 void
 net_applyOperation (net_t* netPtr, operation_t op, long fromId, long toId);
+
+
+/* =============================================================================
+ * HTMnet_applyOperation
+ * =============================================================================
+ */
+void
+HTMnet_applyOperation (net_t* netPtr, operation_t op, long fromId, long toId);
 
 
 /* =============================================================================
  * TMnet_applyOperation
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMnet_applyOperation (TM_ARGDECL
                       net_t* netPtr, operation_t op, long fromId, long toId);
@@ -119,14 +131,24 @@ TMnet_applyOperation (TM_ARGDECL
  * net_hasEdge
  * =============================================================================
  */
+TM_PURE
 bool_t
 net_hasEdge (net_t* netPtr, long fromId, long toId);
+
+
+/* =============================================================================
+ * HTMnet_hasEdge
+ * =============================================================================
+ */
+bool_t
+HTMnet_hasEdge (net_t* netPtr, long fromId, long toId);
 
 
 /* =============================================================================
  * TMnet_hasEdge
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMnet_hasEdge (TM_ARGDECL  net_t* netPtr, long fromId, long toId);
 
@@ -135,6 +157,7 @@ TMnet_hasEdge (TM_ARGDECL  net_t* netPtr, long fromId, long toId);
  * net_isPath
  * =============================================================================
  */
+TM_PURE
 bool_t
 net_isPath (net_t* netPtr,
             long fromId,
@@ -142,11 +165,22 @@ net_isPath (net_t* netPtr,
             bitmap_t* visitedBitmapPtr,
             queue_t* workQueuePtr);
 
+/* =============================================================================
+ * HTMnet_isPath
+ * =============================================================================
+ */
+bool_t
+HTMnet_isPath (net_t* netPtr,
+              long fromId,
+              long toId,
+              bitmap_t* visitedBitmapPtr,
+              queue_t* workQueuePtr);
 
 /* =============================================================================
  * TMnet_isPath
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMnet_isPath (TM_ARGDECL
               net_t* netPtr,
@@ -160,6 +194,7 @@ TMnet_isPath (TM_ARGDECL
  * net_isCycle
  * =============================================================================
  */
+TM_PURE
 bool_t
 net_isCycle (net_t* netPtr);
 
@@ -168,6 +203,7 @@ net_isCycle (net_t* netPtr);
  * net_getParentIdListPtr
  * =============================================================================
  */
+TM_PURE
 list_t*
 net_getParentIdListPtr (net_t* netPtr, long id);
 
@@ -176,6 +212,7 @@ net_getParentIdListPtr (net_t* netPtr, long id);
  * net_getChildIdListPtr
  * =============================================================================
  */
+TM_PURE
 list_t*
 net_getChildIdListPtr (net_t* netPtr, long id);
 
@@ -186,6 +223,7 @@ net_getChildIdListPtr (net_t* netPtr, long id);
  * -- Returns false if id is not root node (i.e., has cycle back id)
  * =============================================================================
  */
+TM_PURE
 bool_t
 net_findAncestors (net_t* netPtr,
                    long id,
@@ -199,6 +237,7 @@ net_findAncestors (net_t* netPtr,
  * -- Returns false if id is not root node (i.e., has cycle back id)
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMnet_findAncestors (TM_ARGDECL
                      net_t* netPtr,
@@ -213,6 +252,7 @@ TMnet_findAncestors (TM_ARGDECL
  * -- Returns false if id is not root node (i.e., has cycle back id)
  * =============================================================================
  */
+TM_PURE
 bool_t
 net_findDescendants (net_t* netPtr,
                      long id,
@@ -221,11 +261,25 @@ net_findDescendants (net_t* netPtr,
 
 
 /* =============================================================================
+ * HTMnet_findDescendants
+ * -- Contents of bitmapPtr set to 1 if descendants, else 0
+ * -- Returns false if id is not root node (i.e., has cycle back id)
+ * =============================================================================
+ */
+bool_t
+HTMnet_findDescendants (net_t* netPtr,
+                       long id,
+                       bitmap_t* descendantBitmapPtr,
+                       queue_t* workQueuePtr);
+
+
+/* =============================================================================
  * TMnet_findDescendants
  * -- Contents of bitmapPtr set to 1 if descendants, else 0
  * -- Returns false if id is not root node (i.e., has cycle back id)
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMnet_findDescendants (TM_ARGDECL
                        net_t* netPtr,
@@ -238,12 +292,55 @@ TMnet_findDescendants (TM_ARGDECL
  * net_generateRandomEdges
  * =============================================================================
  */
+TM_PURE
 void
 net_generateRandomEdges (net_t* netPtr,
                          long maxNumParent,
                          long percentParent,
                          random_t* randomPtr);
 
+
+#define NET_APPLYOPERATION(net, op, from, to)     net_applyOperation(net, \
+                                                                         op, \
+                                                                         from, \
+                                                                         to)
+#define NET_HASEDGE(net, from, to)                net_hasEdge(net, \
+                                                                  from, \
+                                                                  to)
+#define NET_ISPATH(net, from, to, bmp, wq)        net_isPath(net, \
+                                                                 from, \
+                                                                 to, \
+                                                                 bmp, \
+                                                                 wq)
+#define NET_FINDANCESTORS(net, id, bmp, wq)       net_findAncestors(net, \
+                                                                        id, \
+                                                                        bmp, \
+                                                                        wq)
+#define NET_FINDDESCENDANTS(net, id, bmp, wq)     net_findDescendants(net, \
+                                                                          id, \
+                                                                          bmp, \
+                                                                          wq)
+
+#define HTMNET_APPLYOPERATION(net, op, from, to)    HTMnet_applyOperation(TM_ARG \
+                                                                         net, \
+                                                                         op, \
+                                                                         from, \
+                                                                         to)
+#define HTMNET_HASEDGE(net, from, to)               HTMnet_hasEdge(TM_ARG \
+                                                                  net, \
+                                                                  from, \
+                                                                  to)
+#define HTMNET_ISPATH(net, from, to, bmp, wq)       HTMnet_isPath(TM_ARG \
+                                                                 net, \
+                                                                 from, \
+                                                                 to, \
+                                                                 bmp, \
+                                                                 wq)
+#define HTMNET_FINDDESCENDANTS(net, id, bmp, wq)    HTMnet_findDescendants(TM_ARG \
+                                                                          net, \
+                                                                          id, \
+                                                                          bmp, \
+                                                                          wq)
 
 #define TMNET_APPLYOPERATION(net, op, from, to)     TMnet_applyOperation(TM_ARG \
                                                                          net, \

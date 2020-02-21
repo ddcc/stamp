@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -97,6 +97,9 @@ struct net {
     vector_t* nodeVectorPtr;
 };
 
+#define TM_LOG_OP TM_LOG_OP_DECLARE
+#include "net.inc"
+#undef TM_LOG_OP
 
 /* =============================================================================
  * compareId
@@ -235,6 +238,28 @@ insertEdge (net_t* netPtr, long fromId, long toId)
 
 
 /* =============================================================================
+ * HTMinsertEdge
+ * =============================================================================
+ */
+static void
+HTMinsertEdge (net_t* netPtr, long fromId, long toId)
+{
+    vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
+    bool_t status;
+
+    net_node_t* childNodePtr = (net_node_t*)vector_at(nodeVectorPtr, toId);
+    list_t* parentIdListPtr = childNodePtr->parentIdListPtr;
+    status = HTMLIST_INSERT(parentIdListPtr, (void*)fromId);
+    assert(status);
+
+    net_node_t* parentNodePtr = (net_node_t*)vector_at(nodeVectorPtr, fromId);
+    list_t* childIdListPtr = parentNodePtr->childIdListPtr;
+    status = HTMLIST_INSERT(childIdListPtr, (void*)toId);
+    assert(status);
+}
+
+
+/* =============================================================================
  * TMinsertEdge
  * =============================================================================
  */
@@ -279,6 +304,28 @@ removeEdge (net_t* netPtr, long fromId, long toId)
 
 
 /* =============================================================================
+ * HTMremoveEdge
+ * =============================================================================
+ */
+static void
+HTMremoveEdge (net_t* netPtr, long fromId, long toId)
+{
+    vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
+    bool_t status;
+
+    net_node_t* childNodePtr = (net_node_t*)vector_at(nodeVectorPtr, toId);
+    list_t* parentIdListPtr = childNodePtr->parentIdListPtr;
+    status = HTMLIST_REMOVE(parentIdListPtr, (void*)fromId);
+    assert(status);
+
+    net_node_t* parentNodePtr = (net_node_t*)vector_at(nodeVectorPtr, fromId);
+    list_t* childIdListPtr = parentNodePtr->childIdListPtr;
+    status = HTMLIST_REMOVE(childIdListPtr, (void*)toId);
+    assert(status);
+}
+
+
+/* =============================================================================
  * TMremoveEdge
  * =============================================================================
  */
@@ -313,6 +360,18 @@ reverseEdge (net_t* netPtr, long fromId, long toId)
 
 
 /* =============================================================================
+ * HTMreverseEdge
+ * =============================================================================
+ */
+static void
+HTMreverseEdge (net_t* netPtr, long fromId, long toId)
+{
+    HTMremoveEdge(netPtr, fromId, toId);
+    HTMinsertEdge(netPtr, toId, fromId);
+}
+
+
+/* =============================================================================
  * TMreverseEdge
  * =============================================================================
  */
@@ -342,13 +401,33 @@ net_applyOperation (net_t* netPtr, operation_t op, long fromId, long toId)
 
 
 /* =============================================================================
+ * HTMnet_applyOperation
+ * =============================================================================
+ */
+void
+HTMnet_applyOperation (net_t* netPtr, operation_t op, long fromId, long toId)
+{
+    switch (op) {
+        case OPERATION_INSERT:  HTMinsertEdge(TM_ARG   netPtr, fromId, toId); break;
+        case OPERATION_REMOVE:  HTMremoveEdge(TM_ARG   netPtr, fromId, toId); break;
+        case OPERATION_REVERSE: HTMreverseEdge(TM_ARG  netPtr, fromId, toId); break;
+        default:
+            assert(0);
+    }
+}
+
+
+/* =============================================================================
  * TMnet_applyOperation
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMnet_applyOperation (TM_ARGDECL
                       net_t* netPtr, operation_t op, long fromId, long toId)
 {
+    TM_LOG_BEGIN(NET_APPLY, NULL, netPtr, op, fromId, toId);
+
     switch (op) {
         case OPERATION_INSERT:  TMinsertEdge(TM_ARG   netPtr, fromId, toId); break;
         case OPERATION_REMOVE:  TMremoveEdge(TM_ARG   netPtr, fromId, toId); break;
@@ -356,6 +435,8 @@ TMnet_applyOperation (TM_ARGDECL
         default:
             assert(0);
     }
+
+    TM_LOG_END(NET_APPLY, NULL);
 }
 
 
@@ -384,26 +465,62 @@ net_hasEdge (net_t* netPtr, long fromId, long toId)
 
 
 /* =============================================================================
+ * HTMnet_hasEdge
+ * =============================================================================
+ */
+bool_t
+HTMnet_hasEdge (net_t* netPtr, long fromId, long toId)
+{
+    vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
+    net_node_t* childNodePtr = (net_node_t*)vector_at(nodeVectorPtr, toId);
+    list_t* parentIdListPtr = childNodePtr->parentIdListPtr;
+    bool_t rv;
+
+    list_iter_t it;
+    HTMLIST_ITER_RESET(&it, parentIdListPtr);
+    while (HTMLIST_ITER_HASNEXT(&it, parentIdListPtr)) {
+        long parentId = (long)HTMLIST_ITER_NEXT(&it, parentIdListPtr);
+        if (parentId == fromId) {
+            rv = TRUE;
+            goto out;
+        }
+    }
+
+    rv = FALSE;
+out:
+    return rv;
+}
+
+
+/* =============================================================================
  * TMnet_hasEdge
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMnet_hasEdge (TM_ARGDECL  net_t* netPtr, long fromId, long toId)
 {
     vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
     net_node_t* childNodePtr = (net_node_t*)vector_at(nodeVectorPtr, toId);
     list_t* parentIdListPtr = childNodePtr->parentIdListPtr;
+    bool_t rv;
+
+    TM_LOG_BEGIN(NET_HASEDGE, NULL, netPtr, fromId, toId);
 
     list_iter_t it;
     TMLIST_ITER_RESET(&it, parentIdListPtr);
     while (TMLIST_ITER_HASNEXT(&it, parentIdListPtr)) {
         long parentId = (long)TMLIST_ITER_NEXT(&it, parentIdListPtr);
         if (parentId == fromId) {
-            return TRUE;
+            rv = TRUE;
+            goto out;
         }
     }
 
-    return FALSE;
+    rv = FALSE;
+out:
+    TM_LOG_END(NET_HASEDGE, &rv);
+    return rv;
 }
 
 
@@ -455,18 +572,18 @@ net_isPath (net_t* netPtr,
 
 
 /* =============================================================================
- * TMnet_isPath
+ * HTMnet_isPath
  * =============================================================================
  */
 bool_t
-TMnet_isPath (TM_ARGDECL
-              net_t* netPtr,
+HTMnet_isPath (net_t* netPtr,
               long fromId,
               long toId,
               bitmap_t* visitedBitmapPtr,
               queue_t* workQueuePtr)
 {
     bool_t status;
+    bool_t rv;
 
     vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
     assert(visitedBitmapPtr->numBit == vector_getSize(nodeVectorPtr));
@@ -481,7 +598,63 @@ TMnet_isPath (TM_ARGDECL
         long id = (long)queue_pop(workQueuePtr);
         if (id == toId) {
             queue_clear(workQueuePtr);
-            return TRUE;
+            rv = TRUE;
+            goto out;
+        }
+        status = PBITMAP_SET(visitedBitmapPtr, id);
+        assert(status);
+        net_node_t* nodePtr = (net_node_t*)vector_at(nodeVectorPtr, id);
+        list_t* childIdListPtr = nodePtr->childIdListPtr;
+        list_iter_t it;
+        HTMLIST_ITER_RESET(&it, childIdListPtr);
+        while (HTMLIST_ITER_HASNEXT(&it, childIdListPtr)) {
+            long childId = (long)HTMLIST_ITER_NEXT(&it, childIdListPtr);
+            if (!PBITMAP_ISSET(visitedBitmapPtr, childId)) {
+                status = PQUEUE_PUSH(workQueuePtr, (void*)childId);
+                assert(status);
+            }
+        }
+    }
+
+    rv = FALSE;
+out:
+    return rv;
+}
+
+
+/* =============================================================================
+ * TMnet_isPath
+ * =============================================================================
+ */
+TM_CALLABLE
+bool_t
+TMnet_isPath (TM_ARGDECL
+              net_t* netPtr,
+              long fromId,
+              long toId,
+              bitmap_t* visitedBitmapPtr,
+              queue_t* workQueuePtr)
+{
+    bool_t status;
+    bool_t rv;
+
+    vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
+    assert(visitedBitmapPtr->numBit == vector_getSize(nodeVectorPtr));
+
+    TM_LOG_BEGIN(NET_ISPATH, NULL, netPtr, fromId, toId);
+
+    PBITMAP_CLEARALL(visitedBitmapPtr);
+    PQUEUE_CLEAR(workQueuePtr);
+
+    status = PQUEUE_PUSH(workQueuePtr, (void*)fromId);
+    assert(status);
+
+    while (!PQUEUE_ISEMPTY(workQueuePtr)) {
+        long id = (long)queue_pop(workQueuePtr);
+        if (id == toId) {
+            queue_clear(workQueuePtr);
+            rv = TRUE;
+            goto out;
         }
         status = PBITMAP_SET(visitedBitmapPtr, id);
         assert(status);
@@ -498,7 +671,10 @@ TMnet_isPath (TM_ARGDECL
         }
     }
 
-    return FALSE;
+    rv = FALSE;
+out:
+    TM_LOG_END(NET_ISPATH, &rv);
+    return rv;
 }
 
 
@@ -671,6 +847,7 @@ net_findAncestors (net_t* netPtr,
  * -- Returns false if id is not root node (i.e., has cycle back id)
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMnet_findAncestors (TM_ARGDECL
                      net_t* netPtr,
@@ -679,9 +856,12 @@ TMnet_findAncestors (TM_ARGDECL
                      queue_t* workQueuePtr)
 {
     bool_t status;
+    bool_t rv;
 
     vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
     assert(ancestorBitmapPtr->numBit == vector_getSize(nodeVectorPtr));
+
+    TM_LOG_BEGIN(NET_ANCESTORS, NULL, netPtr, id, ancestorBitmapPtr);
 
     PBITMAP_CLEARALL(ancestorBitmapPtr);
     PQUEUE_CLEAR(workQueuePtr);
@@ -704,7 +884,9 @@ TMnet_findAncestors (TM_ARGDECL
         long parentId = (long)PQUEUE_POP(workQueuePtr);
         if (parentId == id) {
             PQUEUE_CLEAR(workQueuePtr);
-            return FALSE;
+            rv = FALSE;
+            TM_LOG_END(NET_ANCESTORS, &rv);
+            return rv;
         }
         net_node_t* nodePtr = (net_node_t*)vector_at(nodeVectorPtr, parentId);
         list_t* grandParentIdListPtr = nodePtr->parentIdListPtr;
@@ -721,7 +903,9 @@ TMnet_findAncestors (TM_ARGDECL
         }
     }
 
-    return TRUE;
+    rv = TRUE;
+    TM_LOG_END(NET_ANCESTORS, &rv);
+    return rv;
 }
 
 
@@ -785,11 +969,75 @@ net_findDescendants (net_t* netPtr,
 
 
 /* =============================================================================
+ * HTMnet_findDescendants
+ * -- Contents of bitmapPtr set to 1 if descendants, else 0
+ * -- Returns false if id is not root node (i.e., has cycle back id)
+ * =============================================================================
+ */
+bool_t
+HTMnet_findDescendants (net_t* netPtr,
+                       long id,
+                       bitmap_t* descendantBitmapPtr,
+                       queue_t* workQueuePtr)
+{
+    bool_t status;
+    bool_t rv;
+
+    vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
+    assert(descendantBitmapPtr->numBit == vector_getSize(nodeVectorPtr));
+
+    PBITMAP_CLEARALL(descendantBitmapPtr);
+    PQUEUE_CLEAR(workQueuePtr);
+
+    {
+        net_node_t* nodePtr = (net_node_t*)vector_at(nodeVectorPtr, id);
+        list_t* childIdListPtr = nodePtr->childIdListPtr;
+        list_iter_t it;
+        HTMLIST_ITER_RESET(&it, childIdListPtr);
+        while (HTMLIST_ITER_HASNEXT(&it, childIdListPtr)) {
+            long childId = (long)HTMLIST_ITER_NEXT(&it, childIdListPtr);
+            status = PBITMAP_SET(descendantBitmapPtr, childId);
+            assert(status);
+            status = PQUEUE_PUSH(workQueuePtr, (void*)childId);
+            assert(status);
+        }
+    }
+
+    while (!PQUEUE_ISEMPTY(workQueuePtr)) {
+        long childId = (long)PQUEUE_POP(workQueuePtr);
+        if (childId == id) {
+            queue_clear(workQueuePtr);
+            rv = FALSE;
+            goto end;
+        }
+        net_node_t* nodePtr = (net_node_t*)vector_at(nodeVectorPtr, childId);
+        list_t* grandChildIdListPtr = nodePtr->childIdListPtr;
+        list_iter_t it;
+        HTMLIST_ITER_RESET(&it, grandChildIdListPtr);
+        while (HTMLIST_ITER_HASNEXT(&it, grandChildIdListPtr)) {
+            long grandChildId = (long)HTMLIST_ITER_NEXT(&it, grandChildIdListPtr);
+            if (!PBITMAP_ISSET(descendantBitmapPtr, grandChildId)) {
+                status = PBITMAP_SET(descendantBitmapPtr, grandChildId);
+                assert(status);
+                status = PQUEUE_PUSH(workQueuePtr, (void*)grandChildId);
+                assert(status);
+            }
+        }
+    }
+
+    rv = TRUE;
+end:
+    return rv;
+}
+
+
+/* =============================================================================
  * TMnet_findDescendants
  * -- Contents of bitmapPtr set to 1 if descendants, else 0
  * -- Returns false if id is not root node (i.e., has cycle back id)
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMnet_findDescendants (TM_ARGDECL
                        net_t* netPtr,
@@ -798,9 +1046,12 @@ TMnet_findDescendants (TM_ARGDECL
                        queue_t* workQueuePtr)
 {
     bool_t status;
+    bool_t rv;
 
     vector_t* nodeVectorPtr = netPtr->nodeVectorPtr;
     assert(descendantBitmapPtr->numBit == vector_getSize(nodeVectorPtr));
+
+    TM_LOG_BEGIN(NET_DESCENDANTS, NULL, netPtr, id, descendantBitmapPtr);
 
     PBITMAP_CLEARALL(descendantBitmapPtr);
     PQUEUE_CLEAR(workQueuePtr);
@@ -823,7 +1074,8 @@ TMnet_findDescendants (TM_ARGDECL
         long childId = (long)PQUEUE_POP(workQueuePtr);
         if (childId == id) {
             queue_clear(workQueuePtr);
-            return FALSE;
+            rv = FALSE;
+            goto end;
         }
         net_node_t* nodePtr = (net_node_t*)vector_at(nodeVectorPtr, childId);
         list_t* grandChildIdListPtr = nodePtr->childIdListPtr;
@@ -840,7 +1092,10 @@ TMnet_findDescendants (TM_ARGDECL
         }
     }
 
-    return TRUE;
+    rv = TRUE;
+end:
+    TM_LOG_END(NET_DESCENDANTS, &rv);
+    return rv;
 }
 
 
@@ -987,3 +1242,14 @@ main ()
  *
  * =============================================================================
  */
+
+__attribute__((constructor)) void net_init() {
+    TM_LOG_FFI_DECLARE;
+    TM_LOG_TYPE_DECLARE_INIT(*pllpp[], {&ffi_type_pointer, &ffi_type_slong, &ffi_type_slong, &ffi_type_pointer, &ffi_type_pointer});
+    TM_LOG_TYPE_DECLARE_INIT(*plpp[], {&ffi_type_pointer, &ffi_type_slong, &ffi_type_pointer, &ffi_type_pointer});
+    TM_LOG_TYPE_DECLARE_INIT(*pill[], {&ffi_type_pointer, &ffi_type_sint, &ffi_type_slong, &ffi_type_slong});
+    TM_LOG_TYPE_DECLARE_INIT(*pll[], {&ffi_type_pointer, &ffi_type_slong, &ffi_type_slong});
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "net.inc"
+    #undef TM_LOG_OP
+}

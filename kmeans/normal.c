@@ -83,10 +83,11 @@
 
 
 #include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <float.h>
 #include <math.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "common.h"
 #include "normal.h"
 #include "random.h"
@@ -94,6 +95,12 @@
 #include "timer.h"
 #include "tm.h"
 #include "util.h"
+
+#if !defined(ORIGINAL) && defined(MERGE_NORMAL)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "normal.inc"
+# undef TM_LOG_OP
+#endif /* !ORIGINAL && MERGE_NORMAL */
 
 double global_time = 0.0;
 
@@ -117,11 +124,14 @@ typedef struct args {
     padded_float_t** new_centers;
 } args_t;
 
-float global_delta;
+padded_float_t global_delta;
 long global_i; /* index into task queue */
 
 #define CHUNK 3
 
+TM_INIT_GLOBAL;
+
+HTM_STATS_EXTERN(global_tsx_status);
 
 /* =============================================================================
  * work
@@ -130,6 +140,8 @@ long global_i; /* index into task queue */
 static void
 work (void* argPtr)
 {
+    __label__ tsx_begin_queue;
+
     TM_THREAD_ENTER();
 
     args_t* args = (args_t*)argPtr;
@@ -141,13 +153,154 @@ work (void* argPtr)
     float** clusters        = args->clusters;
     long**   new_centers_len = args->new_centers_len;
     padded_float_t** new_centers     = args->new_centers;
-    float delta = 0.0;
+    padded_float_t delta = { .f = 0.0 };
     int index;
     int i;
     int j;
     int start;
     int stop;
     int myId;
+
+#if !defined(ORIGINAL) && defined(MERGE_NORMAL)
+    stm_merge_t merge(stm_merge_context_t *params) {
+#ifdef TM_DEBUG
+        printf("\nNORMAL_JIT addr:%p start:%i stop:%i i:%i j:%i\n", params->addr, start, stop, i, j);
+#endif
+
+        ASSERT(params->conflict.entries->type == STM_RD_VALIDATE || params->conflict.entries->type == STM_WR_VALIDATE);
+        ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+        stm_read_t r = ENTRY_GET_READ(params->conflict.entries->e1);
+
+        if ((uintptr_t)params->addr == (uintptr_t)new_centers_len[index]) {
+            /* Conflict is on on *new_centers_len[] */
+            ASSERT((uintptr_t)params->addr >= (uintptr_t)new_centers_len[0] && (uintptr_t) params->addr < (uintptr_t)new_centers[nclusters - 1] + sizeof(padded_float_t) * nfeatures);
+            /* Read the old and new values */
+            ASSERT(STM_SAME_READ(r, TM_SHARED_DID_READ(*new_centers_len[index])));
+            long old, new;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, *new_centers_len[index], old));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, *new_centers_len[index], new));
+            if (old == new)
+                return STM_MERGE_OK;
+
+            const stm_write_t w = TM_SHARED_DID_WRITE(*new_centers_len[index]);
+            ASSERT_FAIL(STM_VALID_WRITE(w));
+            /* Update the write */
+            ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+            /* Increment the length */
+            ASSERT(STM_SAME_WRITE(w, TM_SHARED_DID_WRITE(*new_centers_len[index])));
+            ASSERT_FAIL(TM_SHARED_WRITE_UPDATE(w, *new_centers_len[index], new + 1));
+#ifdef TM_DEBUG
+            printf("NORMAL_JIT *new_centers_len[%i] read (old):%li (new):%li write (new):%li\n", index, old, new, new + 1);
+#endif
+            return STM_MERGE_OK;
+        } else if ((uintptr_t)params->addr >= (uintptr_t)new_centers[index] && (uintptr_t) params->addr < (uintptr_t)new_centers[index] + sizeof(padded_float_t) * nfeatures) {
+            /* Get the index of the conflict on alloc_memory[] */
+            int f = (padded_float_t *)params->addr - new_centers[index];
+
+            /* Conflict is on new_centers[][] */
+            /* Read the old and new values */
+            if (!f) {
+                for (; f < nfeatures; ++f, r = stm_get_load_next(r, 1, 0)) {
+                    float old, new;
+                    if (!STM_VALID_READ(r))
+                        break;
+                    ASSERT_FAIL(stm_get_load_addr(r) == (const volatile stm_word_t *)&new_centers[index][f].f);
+                    ASSERT_FAIL(TM_SHARED_READ_VALUE_F(r, new_centers[index][f].f, old));
+                    ASSERT_FAIL(TM_SHARED_READ_UPDATE_F(r, new_centers[index][f].f, new));
+                    if (old == new)
+                        continue;
+
+                    const stm_write_t w = TM_SHARED_DID_WRITE(new_centers[index][f]);
+                    ASSERT_FAIL(STM_VALID_WRITE(w));
+                    /* Update the write */
+                    ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+                    const float *feature = (float *)TM_SHARED_GET_TAG(r);
+                    ASSERT_FAIL(feature);
+                    /* Increment by the feature value feature[i][j]. Since this parameter can be negative, it is not monotonic. */
+                    ASSERT(STM_SAME_WRITE(w, TM_SHARED_DID_WRITE(new_centers[index][f].f)));
+                    ASSERT_FAIL(TM_SHARED_WRITE_UPDATE_F(w, new_centers[index][f].f, (double)new + (double)*feature));
+#ifdef TM_DEBUG
+                    printf("NORMAL_JIT new_centers[%i][%i] read (old):%f (new):%f, write (new):%f\n", index, f, old, new, new + *feature);
+#endif
+                }
+            } else {
+                ASSERT(STM_SAME_READ(r, TM_SHARED_DID_READ(new_centers[index][f].f)));
+                float old, new;
+                ASSERT_FAIL(TM_SHARED_READ_VALUE_F(r, new_centers[index][f].f, old));
+                ASSERT_FAIL(TM_SHARED_READ_UPDATE_F(r, new_centers[index][f].f, new));
+                if (old == new)
+                    return STM_MERGE_OK;
+
+                const stm_write_t w = TM_SHARED_DID_WRITE(new_centers[index][f]);
+                ASSERT_FAIL(STM_VALID_WRITE(w));
+                /* Update the write */
+                ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+                const float *feature = (float *)TM_SHARED_GET_TAG(r);
+                ASSERT_FAIL(feature);
+                /* Increment by the feature value feature[i][j]. Since this parameter can be negative, it is not monotonic. */
+                ASSERT(STM_SAME_WRITE(w, TM_SHARED_DID_WRITE(new_centers[index][f].f)));
+                ASSERT_FAIL(TM_SHARED_WRITE_UPDATE_F(w, new_centers[index][f].f, (double)new + (double)*feature));
+#ifdef TM_DEBUG
+                printf("NORMAL_JIT new_centers[%i][%i] read (old):%f (new):%f, write (new):%f\n", index, f, old, new, new + *feature);
+#endif
+            }
+
+            return STM_MERGE_OK;
+        } else if (params->addr == &global_i) {
+            /* Read the old and new values */
+            ASSERT(STM_SAME_READ(r, TM_SHARED_DID_READ(global_i)));
+            long old, new;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, global_i, old));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, global_i, new));
+            if (old == new)
+                return STM_MERGE_OK;
+
+            start = new;
+            if (new + CHUNK >= npoints) {
+                TM_FINISH_MERGE();
+                stm_stop(STM_ABORT_EXPLICIT);
+                goto tsx_begin_queue;
+            }
+
+            const stm_write_t w = TM_SHARED_DID_WRITE(global_i);
+            ASSERT_FAIL(STM_VALID_WRITE(w));
+            /* Update the write */
+            ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+            /* Increment by the chunk size. */
+            ASSERT(STM_SAME_WRITE(w, TM_SHARED_DID_WRITE(global_i)));
+            ASSERT_FAIL(TM_SHARED_WRITE_UPDATE(w, global_i, new + CHUNK));
+#ifdef TM_DEBUG
+            printf("NORMAL_JIT global_i read (old):%li (new):%li, write (new):%li\n", old, new, new + CHUNK);
+#endif
+            return STM_MERGE_OK;
+        } else if (params->addr == &global_delta.f) {
+            /* Read the old and new values */
+            ASSERT(STM_SAME_READ(r, TM_SHARED_DID_READ(global_delta.f)));
+            float old, new;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE_F(r, global_delta.f, old));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE_F(r, global_delta.f, new));
+            if (old == new)
+                return STM_MERGE_OK;
+
+            const stm_write_t w = TM_SHARED_DID_WRITE(global_delta.f);
+            ASSERT_FAIL(STM_VALID_WRITE(w));
+            /* Update the write */
+            ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+            /* Increment by the local delta. */
+            ASSERT(STM_SAME_WRITE(w, TM_SHARED_DID_WRITE(global_delta.f)));
+            ASSERT_FAIL(TM_SHARED_WRITE_UPDATE_F(w, global_delta.f, (double)new + (double)delta.f));
+#ifdef TM_DEBUG
+            printf("NORMAL_JIT global_delta read (old):%f (new):%f, write (new):%f\n", old, new, new + delta.f);
+#endif
+            return STM_MERGE_OK;
+        }
+
+# ifdef TM_DEBUG
+        printf("\nNORMAL_JIT UNSUPPORTED addr:%p\n", params->addr);
+# endif
+        return STM_MERGE_UNSUPPORTED;
+    }
+#endif /* !ORIGINAL && MERGE_NORMAL */
 
     myId = thread_getId();
 
@@ -166,7 +319,7 @@ work (void* argPtr)
              * membership[i] cannot be changed by other threads
              */
             if (membership[i] != index) {
-                delta += 1.0;
+                delta.f += 1.0;
             }
 
             /* Assign the membership to object i */
@@ -174,32 +327,85 @@ work (void* argPtr)
             membership[i] = index;
 
             /* Update new cluster centers : sum of objects located within */
-            TM_BEGIN();
-            TM_SHARED_WRITE(*new_centers_len[index],
-                            TM_SHARED_READ(*new_centers_len[index]) + 1);
-            for (j = 0; j < nfeatures; j++) {
-                TM_SHARED_WRITE_F(
-                    new_centers[index][j].f,
-                    (TM_SHARED_READ_F(new_centers[index][j].f) + feature[i][j])
-                );
+            HTM_TX_INIT;
+tsx_begin_center:
+            if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                HTM_LOCK_READ();
+                HTM_SHARED_WRITE(*new_centers_len[index],
+                                HTM_SHARED_READ(*new_centers_len[index]) + 1);
+                for (j = 0; j < nfeatures; j++) {
+                    HTM_SHARED_WRITE_F(
+                        new_centers[index][j].f,
+                        (double)HTM_SHARED_READ_F(new_centers[index][j].f) + (double)feature[i][j]
+                    );
+                }
+                HTM_END(global_tsx_status);
+            } else {
+                HTM_RETRY(tsx_status, tsx_begin_center);
+
+                TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_NORMAL)
+                TM_LOG_BEGIN(NORMAL, merge);
+#endif /* !ORIGINAL && MERGE_NORMAL */
+                TM_SHARED_WRITE(*new_centers_len[index],
+                                TM_SHARED_READ(*new_centers_len[index]) + 1);
+                for (j = 0; j < nfeatures; j++) {
+                    TM_SHARED_WRITE_F(
+                        new_centers[index][j].f,
+                        (double)TM_SHARED_READ_TAG_F(new_centers[index][j].f, (uintptr_t)&feature[i][j]) + (double)feature[i][j]
+                    );
+                }
+                /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+                // TM_LOG_END(NORMAL, NULL);
+                TM_END();
             }
-            TM_END();
         }
 
         /* Update task queue */
         if (start + CHUNK < npoints) {
-            TM_BEGIN();
-            start = (int)TM_SHARED_READ(global_i);
-            TM_SHARED_WRITE(global_i, (start + CHUNK));
-            TM_END();
+            HTM_TX_INIT;
+tsx_begin_queue:
+            if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                HTM_LOCK_READ();
+                start = (int)HTM_SHARED_READ(global_i);
+                HTM_SHARED_WRITE(global_i, start + CHUNK);
+                HTM_END(global_tsx_status);
+            } else {
+                HTM_RETRY(tsx_status, tsx_begin_queue);
+
+                TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_NORMAL)
+                TM_LOG_BEGIN(NORMAL, merge);
+#endif /* !ORIGINAL && MERGE_NORMAL */
+                start = (int)TM_SHARED_READ(global_i);
+                TM_SHARED_WRITE(global_i, start + CHUNK);
+                /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+                // TM_LOG_END(NORMAL, NULL);
+                TM_END();
+            }
         } else {
             break;
         }
     }
 
-    TM_BEGIN();
-    TM_SHARED_WRITE_F(global_delta, TM_SHARED_READ_F(global_delta) + delta);
-    TM_END();
+    HTM_TX_INIT;
+tsx_begin_delta:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        HTM_SHARED_WRITE_F(global_delta.f, (double)HTM_SHARED_READ_F(global_delta.f) + (double)delta.f);
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_delta);
+
+        TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_NORMAL)
+        TM_LOG_BEGIN(NORMAL, merge);
+#endif /* !ORIGINAL && MERGE_NORMAL */
+        TM_SHARED_WRITE_F(global_delta.f, (double)TM_SHARED_READ_F(global_delta.f) + (double)delta.f);
+        /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+        // TM_LOG_END(NORMAL, NULL);
+        TM_END();
+    }
 
     TM_THREAD_EXIT();
 }
@@ -287,7 +493,7 @@ normal_exec (int       nthreads,
         args.new_centers     = new_centers;
 
         global_i = nthreads * CHUNK;
-        global_delta = delta;
+        global_delta.f = delta;
 
 #ifdef OTM
 #pragma omp parallel
@@ -298,7 +504,7 @@ normal_exec (int       nthreads,
         thread_start(work, &args);
 #endif
 
-        delta = global_delta;
+        delta = global_delta.f;
 
         /* Replace old cluster centers with new_centers */
         for (i = 0; i < nclusters; i++) {
@@ -334,3 +540,12 @@ normal_exec (int       nthreads,
  *
  * =============================================================================
  */
+
+#if !defined(ORIGINAL) && defined(MERGE_NORMAL)
+__attribute__((constructor)) void normal_init() {
+    TM_LOG_FFI_DECLARE;
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "normal.inc"
+    #undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_NORMAL */

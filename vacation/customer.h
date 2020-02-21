@@ -89,8 +89,12 @@ typedef struct customer {
  * customer_alloc
  * =============================================================================
  */
+TM_CALLABLE
 customer_t*
 customer_alloc (TM_ARGDECL  long id);
+
+customer_t*
+HTMcustomer_alloc (long id);
 
 customer_t*
 customer_alloc_seq (long id);
@@ -117,14 +121,13 @@ customer_hash (customer_t* customerPtr);
  * customer_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 customer_free (TM_ARGDECL  customer_t* customerPtr);
 
+void
+HTMcustomer_free (customer_t* customerPtr);
 
-/* =============================================================================
- * customer_free_seq
- * =============================================================================
- */
 void
 customer_free_seq (customer_t* customerPtr);
 
@@ -141,6 +144,10 @@ customer_addReservationInfo (TM_ARGDECL
                              reservation_type_t type, long id, long price);
 
 bool_t
+HTMcustomer_addReservationInfo (customer_t* customerPtr,
+                                 reservation_type_t type, long id, long price);
+
+bool_t
 customer_addReservationInfo_seq (customer_t* customerPtr,
                                  reservation_type_t type, long id, long price);
 
@@ -150,6 +157,7 @@ customer_addReservationInfo_seq (customer_t* customerPtr,
  * -- Returns TRUE if success, else FALSE
  * =============================================================================
  */
+TM_CANCELLABLE
 bool_t
 customer_removeReservationInfo (TM_ARGDECL
                                 customer_t* customerPtr,
@@ -166,8 +174,36 @@ long
 customer_getBill (TM_ARGDECL  customer_t* customerPtr);
 
 long
+HTMcustomer_getBill (customer_t* customerPtr);
+
+long
 customer_getBill_seq (customer_t* customerPtr);
 
+
+/* =============================================================================
+ * customer_setCompare
+ * =============================================================================
+ */
+void
+customer_setCompare (long id, customer_t *customerPtr);
+
+#define CUSTOMER_ALLOC_SEQ(id) \
+    customer_alloc_seq(TM_ARG  id)
+#define CUSTOMER_ADD_RESERVATION_INFO_SEQ(cust, type, id, price)  \
+    customer_addReservationInfo_seq(cust, type, id, price)
+#define CUSTOMER_GET_BILL_SEQ(cust) \
+    customer_getBill_seq(cust)
+#define CUSTOMER_FREE_SEQ(cust) \
+    customer_free_seq(TM_ARG  cust)
+
+#define HTMCUSTOMER_ALLOC(id) \
+    HTMcustomer_alloc(TM_ARG  id)
+#define HTMCUSTOMER_ADD_RESERVATION_INFO(cust, type, id, price)  \
+    HTMcustomer_addReservationInfo(cust, type, id, price)
+#define HTMCUSTOMER_GET_BILL(cust) \
+    HTMcustomer_getBill(cust)
+#define HTMCUSTOMER_FREE(cust) \
+    HTMcustomer_free(TM_ARG  cust)
 
 #define CUSTOMER_ALLOC(id) \
     customer_alloc(TM_ARG  id)
@@ -179,10 +215,6 @@ customer_getBill_seq (customer_t* customerPtr);
     customer_getBill(TM_ARG  cust)
 #define CUSTOMER_FREE(cust) \
     customer_free(TM_ARG  cust)
-
-#define CUSTOMER_FREE_SEQ(cust) \
-    customer_free_seq(TM_ARG  cust)
-
 
 #endif /* CUSTOMER_H */
 

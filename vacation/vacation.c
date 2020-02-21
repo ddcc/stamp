@@ -88,6 +88,24 @@
 #include "types.h"
 #include "utility.h"
 
+#ifdef PERSISTENT
+#include <libpmemobj.h>
+#include <sys/stat.h>
+
+#define PERSISTENT_NAME     "/pmem-fs/vacation"
+#define PERSISTENT_LAYOUT   POBJ_LAYOUT_NAME(vacation)
+#define PERSISTENT_SIZE     8UL * 1024 * 1024 * 1024
+
+POBJ_LAYOUT_BEGIN(vacation);
+POBJ_LAYOUT_ROOT(vacation, struct root);
+POBJ_LAYOUT_END(vacation);
+
+typedef struct root {
+    int glb_mgr_initialized;
+    manager_t manager;
+} root_t;
+#endif /* PERSISTENT */
+
 enum param_types {
     PARAM_CLIENTS      = (unsigned char)'c',
     PARAM_NUMBER       = (unsigned char)'n',
@@ -100,11 +118,19 @@ enum param_types {
 #define PARAM_DEFAULT_CLIENTS      (1)
 #define PARAM_DEFAULT_NUMBER       (10)
 #define PARAM_DEFAULT_QUERIES      (90)
-#define PARAM_DEFAULT_RELATIONS    (1 << 16)
-#define PARAM_DEFAULT_TRANSACTIONS (1 << 26)
+#ifdef PERSISTENT
+# define PARAM_DEFAULT_RELATIONS    ((1<<22) + (1<<20) + (1<<19))
+# define PARAM_DEFAULT_TRANSACTIONS (1 << 17)
+#else
+# define PARAM_DEFAULT_RELATIONS    (1 << 16)
+# define PARAM_DEFAULT_TRANSACTIONS (1 << 26)
+#endif /* PERSISTENT */
 #define PARAM_DEFAULT_USER         (80)
 
 double global_params[256]; /* 256 = ascii limit */
+
+
+HTM_STATS(global_tsx_status);
 
 
 /* =============================================================================
@@ -198,7 +224,11 @@ parseArgs (long argc, char* const argv[])
 static bool_t
 addCustomer (manager_t* managerPtr, long id, long num, long price)
 {
+#ifdef PERSISTENT
+    return manager_addCustomer(managerPtr, id);
+#else
     return manager_addCustomer_seq(managerPtr, id);
+#endif /* PERSISTENT */
 }
 
 
@@ -207,19 +237,30 @@ addCustomer (manager_t* managerPtr, long id, long num, long price)
  * =============================================================================
  */
 static manager_t*
-initializeManager ()
-{
-    manager_t* managerPtr;
+initializeManager (
+#ifdef PERSISTENT
+    manager_t *managerPtr
+#endif /* PERSISTENT */
+) {
     long i;
     long numRelation;
     random_t* randomPtr;
     long* ids;
+#ifdef PERSISTENT
+    bool_t (*manager_add[])(manager_t*, long, long, long) = {
+        &manager_addCar,
+        &manager_addFlight,
+        &manager_addRoom,
+        &addCustomer
+    };
+#else
     bool_t (*manager_add[])(manager_t*, long, long, long) = {
         &manager_addCar_seq,
         &manager_addFlight_seq,
         &manager_addRoom_seq,
         &addCustomer
     };
+#endif /* PERSISTENT */
     long t;
     long numTable = sizeof(manager_add) / sizeof(manager_add[0]);
 
@@ -229,7 +270,11 @@ initializeManager ()
     randomPtr = random_alloc();
     assert(randomPtr != NULL);
 
-    managerPtr = manager_alloc();
+#ifdef PERSISTENT
+    manager_alloc(managerPtr);
+#else
+    manager_t* managerPtr = manager_alloc();
+#endif /* PERSISTENT */
     assert(managerPtr != NULL);
 
     numRelation = (long)global_params[PARAM_RELATIONS];
@@ -251,11 +296,21 @@ initializeManager ()
 
         /* Populate table */
         for (i = 0; i < numRelation; i++) {
+#ifdef PERSISTENT
+            if(i % 100000 == 0)
+                printf("Table no. %lu : Completed %lu tuples\n", t, i);
+#endif /* PERSISTENT */
             bool_t status;
             long id = ids[i];
             long num = ((random_generate(randomPtr) % 5) + 1) * 100;
             long price = ((random_generate(randomPtr) % 5) * 10) + 50;
+#ifdef PERSISTENT
+            TM_BEGIN_PERSISTENT();
+#endif /* PERSISTENT */
             status = manager_add[t](managerPtr, id, num, price);
+#ifdef PERSISTENT
+            TM_END();
+#endif /* PERSISTENT */
             assert(status);
         }
 
@@ -357,6 +412,7 @@ checkTables (manager_t* managerPtr)
     printf("Checking tables... ");
     fflush(stdout);
 
+#ifndef PERSISTENT
     /* Check for unique customer IDs */
     long percentQuery = (long)global_params[PARAM_QUERIES];
     long queryRange = (long)((double)percentQuery / 100.0 * (double)numRelation + 0.5);
@@ -388,6 +444,7 @@ checkTables (manager_t* managerPtr)
             }
         }
     }
+#endif /* PERSISTENT */
 
     puts("done.");
     fflush(stdout);
@@ -427,16 +484,63 @@ MAIN(argc, argv)
     GOTO_REAL();
 
     /* Initialization */
+#ifdef PERSISTENT
+    PMEMobjpool *pop;
+    if (!(pop = pmemobj_open(PERSISTENT_NAME, PERSISTENT_LAYOUT))) {
+        if (!(pop = pmemobj_create(PERSISTENT_NAME, PERSISTENT_LAYOUT, PERSISTENT_SIZE, S_IWUSR | S_IRUSR)))
+            return -1;
+    }
+
+    TOID(struct root) root = POBJ_ROOT(pop, struct root);
+    root_t *rootp = D_RW(root);
+#endif /* PERSISTENT */
+
     parseArgs(argc, (char** const)argv);
     SIM_GET_NUM_CPU(global_params[PARAM_CLIENTS]);
+
+    long numThread = global_params[PARAM_CLIENTS];
+
+#ifdef PERSISTENT
+    TM_STARTUP_PERSISTENT(numThread, pop);
+#else
+    TM_STARTUP(numThread);
+#endif /* PERSISTENT */
+
+    P_MEMORY_STARTUP(numThread);
+    thread_startup(numThread);
+
+#ifdef PERSISTENT
+    TM_THREAD_ENTER();
+    managerPtr = &rootp->manager;
+    if (rootp->glb_mgr_initialized) {
+        printf("\n***************************************************\n");
+        printf("\nRe-using tables from previous incarnation...\n");
+        printf("\nPersistent table pointers.\n");
+        printf("\n%s = %p\n%s = %p\n%s = %p\n%s = %p\n",                  \
+                "Car Table     ", managerPtr->carTablePtr,  \
+                "Room Table    ", managerPtr->roomTablePtr,     \
+                "Flight Table  ", managerPtr->flightTablePtr,   \
+                "Customer Table", managerPtr->customerTablePtr);
+        printf("\n***************************************************\n");
+
+        // FIXME: Workaround for function pointers
+        rbtree_setCompare(managerPtr->carTablePtr, rbtree_compare);
+        rbtree_setCompare(managerPtr->carTablePtr, rbtree_compare);
+        rbtree_setCompare(managerPtr->roomTablePtr, rbtree_compare);
+        rbtree_setCompare(managerPtr->flightTablePtr, rbtree_compare);
+        rbtree_setCompare(managerPtr->customerTablePtr, rbtree_compare);
+        rbtree_iterate(managerPtr->customerTablePtr, customer_setCompare);
+    } else {
+        initializeManager(managerPtr);
+        rootp->glb_mgr_initialized = 1;
+    }
+#else
     managerPtr = initializeManager();
+#endif /* PERSISTENT */
+
     assert(managerPtr != NULL);
     clients = initializeClients(managerPtr);
     assert(clients != NULL);
-    long numThread = global_params[PARAM_CLIENTS];
-    TM_STARTUP(numThread);
-    P_MEMORY_STARTUP(numThread);
-    thread_startup(numThread);
 
     /* Run transactions */
     printf("Running clients... ");
@@ -460,6 +564,8 @@ MAIN(argc, argv)
     bool_t status = checkTables(managerPtr);
     assert(status);
 
+    HTM_STATS_PRINT(global_tsx_status);
+
     /* Clean up */
     printf("Deallocating memory... ");
     fflush(stdout);
@@ -474,6 +580,10 @@ MAIN(argc, argv)
     GOTO_SIM();
 
     thread_shutdown();
+
+#ifdef PERSISTENT
+    pmemobj_close(pop);
+#endif /* PERSISTENT */
 
     MAIN_RETURN(!status);
 }

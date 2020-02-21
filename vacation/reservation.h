@@ -104,22 +104,28 @@ typedef struct reservation {
  * -- Returns NULL on failure
  * =============================================================================
  */
+TM_CALLABLE
 reservation_info_t*
 reservation_info_alloc (TM_ARGDECL  reservation_type_t type, long id, long price);
 
+reservation_info_t*
+HTMreservation_info_alloc (reservation_type_t type, long id, long price);
+
+reservation_info_t*
+reservation_info_alloc_seq (reservation_type_t type, long id, long price);
+
 
 /* =============================================================================
  * reservation_info_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 reservation_info_free (TM_ARGDECL  reservation_info_t* reservationInfoPtr);
 
+void
+HTMreservation_info_free (reservation_info_t* reservationInfoPtr);
 
-/* =============================================================================
- * reservation_info_free
- * =============================================================================
- */
 void
 reservation_info_free_seq (reservation_info_t* reservationInfoPtr);
 
@@ -130,7 +136,7 @@ reservation_info_free_seq (reservation_info_t* reservationInfoPtr);
  * =============================================================================
  */
 long
-reservation_info_compare (reservation_info_t* aPtr, reservation_info_t* bPtr);
+reservation_info_compare (const reservation_info_t* aPtr, const reservation_info_t* bPtr);
 
 
 /* =============================================================================
@@ -138,8 +144,12 @@ reservation_info_compare (reservation_info_t* aPtr, reservation_info_t* bPtr);
  * -- Returns NULL on failure
  * =============================================================================
  */
+TM_CANCELLABLE
 reservation_t*
 reservation_alloc (TM_ARGDECL  long id, long price, long numTotal);
+
+reservation_t*
+HTMreservation_alloc (long id, long price, long numTotal);
 
 reservation_t*
 reservation_alloc_seq (long id, long price, long numTotal);
@@ -151,9 +161,12 @@ reservation_alloc_seq (long id, long price, long numTotal);
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
-TM_CALLABLE
+TM_CANCELLABLE
 bool_t
 reservation_addToTotal (TM_ARGDECL  reservation_t* reservationPtr, long num);
+
+bool_t
+HTMreservation_addToTotal (reservation_t* reservationPtr, long num);
 
 bool_t
 reservation_addToTotal_seq (reservation_t* reservationPtr, long num);
@@ -164,9 +177,12 @@ reservation_addToTotal_seq (reservation_t* reservationPtr, long num);
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
-TM_CALLABLE
+TM_CANCELLABLE
 bool_t
 reservation_make (TM_ARGDECL  reservation_t* reservationPtr);
+
+bool_t
+HTMreservation_make (reservation_t* reservationPtr);
 
 bool_t
 reservation_make_seq (reservation_t* reservationPtr);
@@ -177,9 +193,12 @@ reservation_make_seq (reservation_t* reservationPtr);
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
-TM_CALLABLE
+TM_CANCELLABLE
 bool_t
 reservation_cancel (TM_ARGDECL  reservation_t* reservationPtr);
+
+bool_t
+HTMreservation_cancel (reservation_t* reservationPtr);
 
 bool_t
 reservation_cancel_seq (reservation_t* reservationPtr);
@@ -191,9 +210,12 @@ reservation_cancel_seq (reservation_t* reservationPtr);
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
-TM_CALLABLE
+TM_CANCELLABLE
 bool_t
 reservation_updatePrice (TM_ARGDECL  reservation_t* reservationPtr, long newPrice);
+
+bool_t
+HTMreservation_updatePrice (reservation_t* reservationPtr, long newPrice);
 
 bool_t
 reservation_updatePrice_seq (reservation_t* reservationPtr, long newPrice);
@@ -220,25 +242,53 @@ reservation_hash (reservation_t* reservationPtr);
  * reservation_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 reservation_free (TM_ARGDECL  reservation_t* reservationPtr);
 
+void
+HTMreservation_free (reservation_t* reservationPtr);
 
-/* =============================================================================
- * reservation_free_seq
- * =============================================================================
- */
 void
 reservation_free_seq (reservation_t* reservationPtr);
 
+
+#define RESERVATION_INFO_ALLOC_SEQ(type, id, price) \
+    reservation_info_alloc_seq(type, id, price)
+
+#define RESERVATION_ALLOC_SEQ(id, price, tot) \
+    reservation_alloc_seq(id, price, tot)
+#define RESERVATION_ADD_TO_TOTAL_SEQ(r, num) \
+    reservation_addToTotal_seq(r, num)
+#define RESERVATION_MAKE_SEQ(r) \
+    reservation_make_seq(r)
+#define RESERVATION_INFO_FREE_SEQ(r) \
+    reservation_info_free_seq(r)
+#define RESERVATION_CANCEL_SEQ(r) \
+    reservation_cancel_seq(r)
+#define RESERVATION_FREE_SEQ(r) \
+    reservation_free_seq(TM_ARG  r)
+
+#define HTMRESERVATION_INFO_ALLOC(type, id, price) \
+    HTMreservation_info_alloc(type, id, price)
+
+#define HTMRESERVATION_ALLOC(id, price, tot) \
+    HTMreservation_alloc(id, price, tot)
+#define HTMRESERVATION_ADD_TO_TOTAL(r, num) \
+    HTMreservation_addToTotal(r, num)
+#define HTMRESERVATION_MAKE(r) \
+    HTMreservation_make(r)
+#define HTMRESERVATION_INFO_FREE(r) \
+    HTMreservation_info_free(r)
+#define HTMRESERVATION_CANCEL(r) \
+    HTMreservation_cancel(r)
+#define HTMRESERVATION_FREE(r) \
+    HTMreservation_free(TM_ARG  r)
 
 #define RESERVATION_INFO_ALLOC(type, id, price) \
     reservation_info_alloc(TM_ARG  type, id, price)
 #define RESERVATION_INFO_FREE(r) \
     reservation_info_free(TM_ARG  r)
-
-#define RESERVATION_INFO_FREE_SEQ(r) \
-    reservation_info_free_seq(TM_ARG  r)
 
 #define RESERVATION_ALLOC(id, price, tot) \
     reservation_alloc(TM_ARG  id, price, tot)
@@ -252,9 +302,6 @@ reservation_free_seq (reservation_t* reservationPtr);
     reservation_updatePrice(TM_ARG  r, price)
 #define RESERVATION_FREE(r) \
     reservation_free(TM_ARG  r)
-
-#define RESERVATION_FREE_SEQ(r) \
-    reservation_free_seq(TM_ARG  r)
 
 
 #endif /* RESERVATION_H */

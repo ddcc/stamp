@@ -5,7 +5,7 @@
 # ==============================================================================
 
 
-CFLAGS += -DOUTPUT_VERIFY
+CFLAGS += -DOUTPUT_VERIFY -DMERGE_NORMAL
 
 PROG := kmeans
 

@@ -1,0 +1,62 @@
+# ==============================================================================
+#
+# Makefile.stm
+#
+# ==============================================================================
+
+
+# ==============================================================================
+# Variables
+# ==============================================================================
+
+
+CFLAGS   += -DSTM -I$(STM)/include
+LDFLAGS  += -L$(STM)/lib -rdynamic
+LIBS     += -lstm -lffi
+
+ifeq ($(STM_HTM_STM),1)
+  CFLAGS += -DSTM_HTM -DSTM_HTM_STM -mrtm
+  LDFLAGS += -Wl,-z,now
+else ifeq ($(STM_HTM_DIRECT),1)
+  CFLAGS += -DSTM_HTM -DSTM_HTM_DIRECT -mrtm
+  LDFLAGS += -Wl,-z,now
+endif
+
+ifdef STM_HTM_RETRY_GLOBAL
+  CFLAGS += -DSTM_HTM_RETRY_GLOBAL=$(STM_HTM_RETRY_GLOBAL)
+endif
+ifdef STM_HTM_RETRY_TX
+  CFLAGS += -DSTM_HTM_RETRY_TX=$(STM_HTM_RETRY_TX)
+endif
+ifdef STM_HTM_RETRY_COUNTER
+  CFLAGS += -DSTM_HTM_RETRY_COUNTER=$(STM_HTM_RETRY_COUNTER)
+endif
+ifdef STM_HTM_RETRY_ABLE
+  CFLAGS += -DHTM_RETRY_ABLE=$(STM_HTM_RETRY_ABLE)
+endif
+
+CPPFLAGS := $(CFLAGS)
+
+
+# ==============================================================================
+# Rules
+# ==============================================================================
+
+.PHONY: default
+default: $(PROG)
+
+.PHONY: clean
+clean:
+	$(RM) $(OBJS) $(PROG) $(OUTPUT)
+
+$(PROG): $(OBJS)
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $(PROG)
+
+include ../common/Makefile.common
+
+
+# ==============================================================================
+#
+# End of Makefile.stm
+#
+# ==============================================================================

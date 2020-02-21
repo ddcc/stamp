@@ -65,6 +65,7 @@
 
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "computeGraph.h"
@@ -75,12 +76,21 @@
 #include "utility.h"
 #include "tm.h"
 
+#if !defined(ORIGINAL) && defined(MERGE_COMPUTE)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "computeGraph.inc"
+# undef TM_LOG_OP
+#endif /* !ORIGINAL && MERGE_COMPUTE */
+
 static ULONGINT_T*  global_p                 = NULL;
 static ULONGINT_T   global_maxNumVertices    = 0;
 static ULONGINT_T   global_outVertexListSize = 0;
 static ULONGINT_T*  global_impliedEdgeList   = NULL;
 static ULONGINT_T** global_auxArr            = NULL;
 
+TM_INIT_GLOBAL;
+
+HTM_STATS_EXTERN(global_tsx_status);
 
 /* =============================================================================
  * prefix_sums
@@ -157,6 +167,66 @@ computeGraph (void* argPtr)
     graph*    GPtr       = ((computeGraph_arg_t*)argPtr)->GPtr;
     graphSDG* SDGdataPtr = ((computeGraph_arg_t*)argPtr)->SDGdataPtr;
 
+    ULONGINT_T* impliedEdgeList;
+    ULONGINT_T v;
+    long inDegree;
+    long i;
+
+#if !defined(ORIGINAL) && defined(MERGE_COMPUTE)
+    stm_merge_t merge(stm_merge_context_t *params) {
+#ifdef TM_DEBUG
+        printf("\nGRAPH_EDGES_JIT addr:%p v:%li\n", params->addr, v);
+#endif
+
+        /* Conflict occurred directly inside GRAPH_EDGES on inDegree[v] */
+        if ((uintptr_t)params->addr >= (uintptr_t)GPtr->inDegree && (uintptr_t) params->addr < (uintptr_t)GPtr->inDegree + sizeof(ULONGINT_T) * GPtr->numVertices) {
+            ASSERT(params->leaf == 1);
+            ASSERT(params->conflict.entries->type == STM_RD_VALIDATE || params->conflict.entries->type == STM_WR_VALIDATE);
+            ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+            const stm_read_t r = ENTRY_GET_READ(params->conflict.entries->e1);
+
+            /* Conflict is on inDegree[v] */
+            /* Read the old and new values */
+            ASSERT(STM_SAME_READ(r, TM_SHARED_DID_READ(GPtr->inDegree[v])));
+            long old, new;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, GPtr->inDegree[v], old));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, GPtr->inDegree[v], new));
+            if (old == new)
+                return STM_MERGE_OK;
+            if (new >= MAX_CLUSTER_SIZE)
+                return STM_MERGE_ABORT;
+
+            stm_write_t w = TM_SHARED_DID_WRITE(GPtr->inDegree[v]);
+            #ifdef TM_DEBUG
+            if (STM_VALID_WRITE(w))
+                printf("GRAPH_EDGES_JIT inDegree[%li] read (old):%li (new):%li, write (new):%li\n", v, old, new, new + 1);
+            else
+                printf("GRAPH_EDGES_JIT inDegree[%li] read (old):%li (new):%li\n", v, old, new);
+            #endif
+            /* Update the write */
+            ASSERT_FAIL(STM_VALID_WRITE(w));
+            ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+            /* Increment the list size. Since the difference must be >= 1, it is monotonically increasing. */
+            ASSERT(STM_SAME_WRITE(w, TM_SHARED_DID_WRITE(GPtr->inDegree[v])));
+            ASSERT_FAIL(TM_SHARED_WRITE_UPDATE(w, GPtr->inDegree[v], new + 1));
+
+            /* Fix the append to impliedEdgeList */
+            w = TM_SHARED_DID_WRITE(impliedEdgeList[v*MAX_CLUSTER_SIZE+old]);
+            if (STM_VALID_WRITE(w)) {
+                ASSERT_FAIL(TM_SHARED_UNDO_WRITE(w));
+                TM_SHARED_WRITE(impliedEdgeList[v*MAX_CLUSTER_SIZE+inDegree], i);
+            }
+
+            return STM_MERGE_OK;
+        }
+
+# ifdef TM_DEBUG
+        printf("\nGRAPH_EDGES_JIT UNSUPPORTED addr:%p\n", params->addr);
+# endif
+        return STM_MERGE_UNSUPPORTED;
+    }
+#endif /* !ORIGINAL && MERGE_COMPUTE */
+
     long myId = thread_getId();
     long numThread = thread_getNumThread();
 
@@ -169,7 +239,6 @@ computeGraph (void* argPtr)
      * startVertex list
      */
 
-    long i;
     long i_start;
     long i_stop;
     createPartition(0, numEdgesPlaced, myId, numThread, &i_start, &i_stop);
@@ -180,11 +249,23 @@ computeGraph (void* argPtr)
         }
     }
 
-    TM_BEGIN();
-    long tmp_maxNumVertices = (long)TM_SHARED_READ(global_maxNumVertices);
-    long new_maxNumVertices = MAX(tmp_maxNumVertices, maxNumVertices) + 1;
-    TM_SHARED_WRITE(global_maxNumVertices, new_maxNumVertices);
-    TM_END();
+    HTM_TX_INIT;
+tsx_begin_num:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        long tmp_maxNumVertices = (long)HTM_SHARED_READ(global_maxNumVertices);
+        long new_maxNumVertices = MAX(tmp_maxNumVertices, maxNumVertices) + 1;
+        HTM_SHARED_WRITE(global_maxNumVertices, new_maxNumVertices);
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_num);
+
+        TM_BEGIN();
+        long tmp_maxNumVertices = (long)TM_SHARED_READ(global_maxNumVertices);
+        long new_maxNumVertices = MAX(tmp_maxNumVertices, maxNumVertices) + 1;
+        TM_SHARED_WRITE(global_maxNumVertices, new_maxNumVertices);
+        TM_END();
+    }
 
     thread_barrier_wait();
 
@@ -296,12 +377,24 @@ computeGraph (void* argPtr)
 
     thread_barrier_wait();
 
-    TM_BEGIN();
-    TM_SHARED_WRITE(
-        global_outVertexListSize,
-        ((long)TM_SHARED_READ(global_outVertexListSize) + outVertexListSize)
-    );
-    TM_END();
+tsx_begin_size:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        HTM_SHARED_WRITE(
+            global_outVertexListSize,
+            ((long)HTM_SHARED_READ(global_outVertexListSize) + outVertexListSize)
+        );
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_size);
+
+        TM_BEGIN();
+        TM_SHARED_WRITE(
+            global_outVertexListSize,
+            ((long)TM_SHARED_READ(global_outVertexListSize) + outVertexListSize)
+        );
+        TM_END();
+    }
 
     thread_barrier_wait();
 
@@ -414,7 +507,6 @@ computeGraph (void* argPtr)
     }
 
     /* A temp. array to store the inplied edges */
-    ULONGINT_T* impliedEdgeList;
     if (myId == 0) {
         impliedEdgeList = (ULONGINT_T*)P_MALLOC(GPtr->numVertices
                                                 * MAX_CLUSTER_SIZE
@@ -461,7 +553,7 @@ computeGraph (void* argPtr)
              j < (GPtr->outVertexIndex[i] + GPtr->outDegree[i]);
              j++)
         {
-            ULONGINT_T v = GPtr->outVertexList[j];
+            v = GPtr->outVertexList[j];
             ULONGINT_T k;
             for (k = GPtr->outVertexIndex[v];
                  k < (GPtr->outVertexIndex[v] + GPtr->outDegree[v]);
@@ -472,28 +564,61 @@ computeGraph (void* argPtr)
                 }
             }
             if (k == GPtr->outVertexIndex[v]+GPtr->outDegree[v]) {
-                TM_BEGIN();
-                /* Add i to the impliedEdgeList of v */
-                long inDegree = (long)TM_SHARED_READ(GPtr->inDegree[v]);
-                TM_SHARED_WRITE(GPtr->inDegree[v], (inDegree + 1));
-                if (inDegree < MAX_CLUSTER_SIZE) {
-                    TM_SHARED_WRITE(impliedEdgeList[v*MAX_CLUSTER_SIZE+inDegree],
-                                    i);
-                } else {
-                    /* Use auxiliary array to store the implied edge */
-                    /* Create an array if it's not present already */
-                    ULONGINT_T* a = NULL;
-                    if ((inDegree % MAX_CLUSTER_SIZE) == 0) {
-                        a = (ULONGINT_T*)TM_MALLOC(MAX_CLUSTER_SIZE
-                                                   * sizeof(ULONGINT_T));
-                        assert(a);
-                        TM_SHARED_WRITE_P(auxArr[v], a);
+tsx_begin_add:
+                if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                    HTM_LOCK_READ();
+                    /* Add i to the impliedEdgeList of v */
+                    inDegree = (long)HTM_SHARED_READ(GPtr->inDegree[v]);
+                    HTM_SHARED_WRITE(GPtr->inDegree[v], (inDegree + 1));
+                    if (inDegree < MAX_CLUSTER_SIZE) {
+                        HTM_SHARED_WRITE(impliedEdgeList[v*MAX_CLUSTER_SIZE+inDegree],
+                                        i);
                     } else {
-                        a = auxArr[v];
+                        /* Use auxiliary array to store the implied edge */
+                        /* Create an array if it's not present already */
+                        ULONGINT_T* a = NULL;
+                        if ((inDegree % MAX_CLUSTER_SIZE) == 0) {
+                            a = (ULONGINT_T*)HTM_MALLOC(MAX_CLUSTER_SIZE
+                                                       * sizeof(ULONGINT_T));
+                            assert(a);
+                            HTM_SHARED_WRITE_P(auxArr[v], a);
+                        } else {
+                            a = auxArr[v];
+                        }
+                        HTM_SHARED_WRITE(a[inDegree % MAX_CLUSTER_SIZE], i);
                     }
-                    TM_SHARED_WRITE(a[inDegree % MAX_CLUSTER_SIZE], i);
+                    HTM_END(global_tsx_status);
+                } else {
+                    HTM_RETRY(tsx_status, tsx_begin_add);
+
+                    TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_COMPUTE)
+                    TM_LOG_BEGIN(GRAPH_EDGES, merge);
+#endif /* !ORIGINAL && MERGE_COMPUTE */
+                    /* Add i to the impliedEdgeList of v */
+                    inDegree = (long)TM_SHARED_READ(GPtr->inDegree[v]);
+                    TM_SHARED_WRITE(GPtr->inDegree[v], (inDegree + 1));
+                    if (inDegree < MAX_CLUSTER_SIZE) {
+                        TM_SHARED_WRITE(impliedEdgeList[v*MAX_CLUSTER_SIZE+inDegree],
+                                        i);
+                    } else {
+                        /* Use auxiliary array to store the implied edge */
+                        /* Create an array if it's not present already */
+                        ULONGINT_T* a = NULL;
+                        if ((inDegree % MAX_CLUSTER_SIZE) == 0) {
+                            a = (ULONGINT_T*)TM_MALLOC(MAX_CLUSTER_SIZE
+                                                       * sizeof(ULONGINT_T));
+                            assert(a);
+                            TM_SHARED_WRITE_P(auxArr[v], a);
+                        } else {
+                            a = auxArr[v];
+                        }
+                        TM_SHARED_WRITE(a[inDegree % MAX_CLUSTER_SIZE], i);
+                    }
+                    /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+                    // TM_LOG_END(GRAPH_EDGES, NULL);
+                    TM_END();
                 }
-                TM_END();
             }
         }
     } /* for i */
@@ -558,3 +683,12 @@ computeGraph (void* argPtr)
  *
  * =============================================================================
  */
+
+#if !defined(ORIGINAL) && defined(MERGE_COMPUTE)
+__attribute__((constructor)) void compute_init() {
+    TM_LOG_FFI_DECLARE;
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "computeGraph.inc"
+    #undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_COMPUTE */

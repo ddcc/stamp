@@ -130,10 +130,37 @@ Pvector_alloc (long initCapacity)
 
 
 /* =============================================================================
+ * HTMvector_alloc
+ * -- Returns NULL if failed
+ * =============================================================================
+ */
+vector_t*
+HTMvector_alloc (long initCapacity)
+{
+    vector_t* vectorPtr;
+    long capacity = MAX(initCapacity, 1);
+
+    vectorPtr = (vector_t*)HTM_MALLOC(sizeof(vector_t));
+
+    if (vectorPtr != NULL) {
+        vectorPtr->size = 0;
+        vectorPtr->capacity = capacity;
+        vectorPtr->elements = (void**)HTM_MALLOC(capacity * sizeof(void*));
+        if (vectorPtr->elements == NULL) {
+            return NULL;
+        }
+    }
+
+    return vectorPtr;
+}
+
+
+/* =============================================================================
  * TMvector_alloc
  * -- Returns NULL if failed
  * =============================================================================
  */
+TM_CALLABLE
 vector_t*
 TMvector_alloc (long initCapacity)
 {
@@ -153,6 +180,7 @@ TMvector_alloc (long initCapacity)
 
     return vectorPtr;
 }
+
 
 /* =============================================================================
  * vector_free
@@ -253,10 +281,40 @@ Pvector_pushBack (vector_t* vectorPtr, void* dataPtr)
 
 
 /* =============================================================================
+ * HTMvector_pushBack
+ * -- Returns FALSE if fail, else TRUE
+ * =============================================================================
+ */
+bool_t
+HTMvector_pushBack (vector_t* vectorPtr, void* dataPtr)
+{
+    if (vectorPtr->size == vectorPtr->capacity) {
+        long i;
+        long newCapacity = vectorPtr->capacity * 2;
+        void** newElements = (void**)HTM_MALLOC(newCapacity * sizeof(void*));
+        if (newElements == NULL) {
+            return FALSE;
+        }
+        vectorPtr->capacity = newCapacity;
+        for (i = 0; i < vectorPtr->size; i++) {
+            newElements[i] = vectorPtr->elements[i];
+        }
+        HTM_FREE(vectorPtr->elements);
+        vectorPtr->elements = newElements;
+    }
+
+    vectorPtr->elements[vectorPtr->size++] = dataPtr;
+
+    return TRUE;
+}
+
+
+/* =============================================================================
  * TMvector_pushBack
  * -- Returns FALSE if fail, else TRUE
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMvector_pushBack (vector_t* vectorPtr, void* dataPtr)
 {

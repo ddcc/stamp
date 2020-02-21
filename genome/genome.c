@@ -242,6 +242,8 @@ MAIN (argc,argv)
     printf("Sequencing time = %lf\n", TIMER_DIFF_SECONDS(start, stop));
     fflush(stdout);
 
+    HTM_STATS_PRINT(global_tsx_status);
+
     /* Check result */
     int result = 0;
     {

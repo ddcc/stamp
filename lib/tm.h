@@ -1,1 +1,1 @@
-../tm-runtimes/tinySTM/tm.h
+../tm-runtimes/tardisTM/tm.h

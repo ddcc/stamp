@@ -25,7 +25,7 @@ SRCS += \
 #
 OBJS := ${SRCS:.c=.o}
 
-CFLAGS += -DUSE_EARLY_RELEASE
+CFLAGS += -DUSE_EARLY_RELEASE -DGRID_COPY -DMERGE_ROUTER
 
 
 # ==============================================================================

@@ -1,1 +1,0 @@
-../tm-runtimes/tinySTM/Defines.common.mk

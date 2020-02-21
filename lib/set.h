@@ -90,6 +90,10 @@
 #  define SET_INSERT(map, key)        rbtree_insert(map, (void*)(key), NULL)
 #  define SET_REMOVE(map, key)        rbtree_delete(map, (void*)(key))
 
+#  define HTMSET_CONTAINS(map, key)   HTMRBTREE_CONTAINS(map, (void*)(key))
+#  define HTMSET_INSERT(map, key)     HTMRBTREE_INSERT(map, (void*)(key), NULL)
+#  define HTMSET_REMOVE(map, key)     HTMRBTREE_DELETE(map, (void*)(key))
+
 #  define TMSET_CONTAINS(map, key)    TMRBTREE_CONTAINS(map, (void*)(key))
 #  define TMSET_INSERT(map, key)      TMRBTREE_INSERT(map, (void*)(key), NULL)
 #  define TMSET_REMOVE(map, key)      TMRBTREE_DELETE(map, (void*)(key))

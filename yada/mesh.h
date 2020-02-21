@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -108,12 +108,37 @@ mesh_insert (mesh_t* meshPtr, element_t* elementPtr, MAP_T* edgeMapPtr);
 
 
 /* =============================================================================
- * TMmesh_insert
+ * HTMmesh_insert
  * =============================================================================
  */
 void
+HTMmesh_insert (mesh_t* meshPtr, element_t* elementPtr, MAP_T* edgeMapPtr);
+
+
+/* =============================================================================
+ * TMmesh_insert
+ * =============================================================================
+ */
+TM_CANCELLABLE
+void
 TMmesh_insert (TM_ARGDECL
                mesh_t* meshPtr, element_t* elementPtr, MAP_T* edgeMapPtr);
+
+
+/* =============================================================================
+ * mesh_remove
+ * =============================================================================
+ */
+void
+mesh_remove (mesh_t* meshPtr, element_t* elementPtr);
+
+
+/* =============================================================================
+ * HTMmesh_remove
+ * =============================================================================
+ */
+void
+HTMmesh_remove (mesh_t* meshPtr, element_t* elementPtr);
 
 
 /* =============================================================================
@@ -126,17 +151,51 @@ TMmesh_remove (TM_ARGDECL  mesh_t* meshPtr, element_t* elementPtr);
 
 
 /* =============================================================================
- * TMmesh_insertBoundary
+ * mesh_insertBoundary
  * =============================================================================
  */
 bool_t
+mesh_insertBoundary (mesh_t* meshPtr, edge_t* boundaryPtr);
+
+
+/* =============================================================================
+ * HTMmesh_insertBoundary
+ * =============================================================================
+ */
+bool_t
+HTMmesh_insertBoundary (mesh_t* meshPtr, edge_t* boundaryPtr);
+
+
+/* =============================================================================
+ * TMmesh_insertBoundary
+ * =============================================================================
+ */
+TM_CALLABLE
+bool_t
 TMmesh_insertBoundary (TM_ARGDECL  mesh_t* meshPtr, edge_t* boundaryPtr);
+
+
+/* =============================================================================
+ * mesh_removeBoundary
+ * =============================================================================
+ */
+bool_t
+mesh_removeBoundary (mesh_t* meshPtr, edge_t* boundaryPtr);
+
+
+/* =============================================================================
+ * HTMmesh_removeBoundary
+ * =============================================================================
+ */
+bool_t
+HTMmesh_removeBoundary (mesh_t* meshPtr, edge_t* boundaryPtr);
 
 
 /* =============================================================================
  * TMmesh_removeBoundary
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMmesh_removeBoundary (TM_ARGDECL  mesh_t* meshPtr, edge_t* boundaryPtr);
 
@@ -177,6 +236,11 @@ mesh_shuffleBad (mesh_t* meshPtr, random_t* randomPtr);
 bool_t
 mesh_check (mesh_t* meshPtr, long expectedNumElement);
 
+
+#define HTMMESH_INSERT(m, e, em)        HTMmesh_insert(m, e, em)
+#define HTMMESH_REMOVE(m, e)            HTMmesh_remove(m, e)
+#define HTMMESH_INSERTBOUNDARY(m, b)    HTMmesh_insertBoundary(m, b)
+#define HTMMESH_REMOVEBOUNDARY(m, b)    HTMmesh_removeBoundary(m, b)
 
 #define TMMESH_INSERT(m, e, em)         TMmesh_insert(TM_ARG  m, e, em)
 #define TMMESH_REMOVE(m, e)             TMmesh_remove(TM_ARG  m, e)

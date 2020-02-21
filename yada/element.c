@@ -105,12 +105,18 @@ double global_angleConstraint = 20.0;
 extern double global_angleConstraint;
 #endif
 
+#if !defined(ORIGINAL) && defined(MERGE_ELEMENT)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "element.inc"
+# undef TM_LOG_OP
+#endif /* !ORIGINAL && MERGE_ELEMENT */
 
 /* =============================================================================
  * minimizeCoordinates
  * -- put smallest coordinate in position 0
  * =============================================================================
  */
+TM_PURE
 static void
 minimizeCoordinates (element_t* elementPtr)
 {
@@ -142,6 +148,7 @@ minimizeCoordinates (element_t* elementPtr)
  * -- Sets isSkinny to TRUE if the angle constraint is not met
  * =============================================================================
  */
+TM_PURE
 static void
 checkAngles (element_t* elementPtr)
 {
@@ -211,6 +218,7 @@ checkAngles (element_t* elementPtr)
  *
  * =============================================================================
  */
+TM_PURE
 static void
 calculateCircumCircle (element_t* elementPtr)
 {
@@ -257,6 +265,7 @@ calculateCircumCircle (element_t* elementPtr)
   * Note: Makes pairPtr sorted; i.e., coordinate_compare(first, second) < 0
  * =============================================================================
  */
+TM_PURE
 static void
 setEdge (element_t* elementPtr, long i)
 {
@@ -358,10 +367,10 @@ element_listCompare (const void* aPtr, const void* bPtr)
  * =============================================================================
  */
 long
-element_mapCompare (const pair_t* aPtr, const pair_t* bPtr)
+element_mapCompare (const void* aPtr, const void* bPtr)
 {
-    element_t* aElementPtr = (element_t*)(aPtr->firstPtr);
-    element_t* bElementPtr = (element_t*)(bPtr->firstPtr);
+    element_t* aElementPtr = (element_t*)aPtr;
+    element_t* bElementPtr = (element_t*)bPtr;
 
     return element_compare(aElementPtr, bElementPtr);
 }
@@ -432,11 +441,44 @@ Pelement_alloc (coordinate_t* coordinates, long numCoordinate)
 
 
 /* =============================================================================
+ * HTMelement_alloc
+ *
+ * Contains a copy of input arg 'coordinates'
+ * =============================================================================
+ */
+element_t*
+HTMelement_alloc (coordinate_t* coordinates, long numCoordinate)
+{
+    element_t* elementPtr;
+
+    elementPtr = (element_t*)HTM_MALLOC(sizeof(element_t));
+    if (elementPtr) {
+        long i;
+        for (i = 0; i < numCoordinate; i++) {
+            elementPtr->coordinates[i] = coordinates[i];
+        }
+        elementPtr->numCoordinate = numCoordinate;
+        minimizeCoordinates(elementPtr);
+        checkAngles(elementPtr);
+        calculateCircumCircle(elementPtr);
+        initEdges(elementPtr, coordinates, numCoordinate);
+        elementPtr->neighborListPtr = HTMLIST_ALLOC(element_listCompare);
+        assert(elementPtr->neighborListPtr);
+        elementPtr->isGarbage = FALSE;
+        elementPtr->isReferenced = FALSE;
+    }
+
+    return elementPtr;
+}
+
+
+/* =============================================================================
  * TMelement_alloc
  *
  * Contains a copy of input arg 'coordinates'
  * =============================================================================
  */
+TM_CALLABLE
 element_t*
 TMelement_alloc (TM_ARGDECL  coordinate_t* coordinates, long numCoordinate)
 {
@@ -488,9 +530,22 @@ Pelement_free (element_t* elementPtr)
 
 
 /* =============================================================================
+ * HTMelement_free
+ * =============================================================================
+ */
+void
+HTMelement_free (element_t* elementPtr)
+{
+    HTMLIST_FREE(elementPtr->neighborListPtr, NULL);
+    HTM_FREE(elementPtr);
+}
+
+
+/* =============================================================================
  * TMelement_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMelement_free (TM_ARGDECL  element_t* elementPtr)
 {
@@ -567,10 +622,10 @@ element_listCompareEdge (const void* aPtr, const void* bPtr)
  * =============================================================================
  */
 long
-element_mapCompareEdge (const pair_t* aPtr, const pair_t* bPtr)
+element_mapCompareEdge (const void* aPtr, const void* bPtr)
 {
-    edge_t* aEdgePtr = (edge_t*)(aPtr->firstPtr);
-    edge_t* bEdgePtr = (edge_t*)(bPtr->firstPtr);
+    edge_t* aEdgePtr = (edge_t*)aPtr;
+    edge_t* bEdgePtr = (edge_t*)bPtr;
 
     return compareEdge(aEdgePtr, bEdgePtr);
 }
@@ -688,14 +743,35 @@ element_isReferenced (element_t* elementPtr)
 
 
 /* =============================================================================
- * TMelement_isReferenced
+ * HTMelement_isReferenced
  * -- Held by another data structure?
  * =============================================================================
  */
 bool_t
+HTMelement_isReferenced (element_t* elementPtr)
+{
+    bool_t rv = (bool_t)HTM_SHARED_READ(elementPtr->isReferenced);
+    return rv;
+}
+
+
+/* =============================================================================
+ * TMelement_isReferenced
+ * -- Held by another data structure?
+ * =============================================================================
+ */
+TM_CALLABLE
+bool_t
 TMelement_isReferenced (TM_ARGDECL  element_t* elementPtr)
 {
-    return (bool_t)TM_SHARED_READ(elementPtr->isReferenced);
+#if !defined(ORIGINAL) && defined(MERGE_ELEMENT)
+    TM_LOG_BEGIN(ELEM_ISREFERENCED, NULL, elementPtr);
+#endif /* !ORIGINAL && MERGE_ELEMENT */
+    bool_t rv = (bool_t)TM_SHARED_READ_TAG(elementPtr->isReferenced, elementPtr);
+#if !defined(ORIGINAL) && defined(MERGE_ELEMENT)
+    TM_LOG_END(ELEM_ISREFERENCED, &rv);
+#endif /* !ORIGINAL && MERGE_ELEMENT */
+    return rv;
 }
 
 
@@ -711,9 +787,21 @@ element_setIsReferenced (element_t* elementPtr, bool_t status)
 
 
 /* =============================================================================
+ * HTMelement_setIsReferenced
+ * =============================================================================
+ */
+void
+HTMelement_setIsReferenced (element_t* elementPtr, bool_t status)
+{
+    HTM_SHARED_WRITE(elementPtr->isReferenced, status);
+}
+
+
+/* =============================================================================
  * TMelement_setIsReferenced
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMelement_setIsReferenced (TM_ARGDECL  element_t* elementPtr, bool_t status)
 {
@@ -734,14 +822,34 @@ element_isGarbage (element_t* elementPtr)
 
 
 /* =============================================================================
- * TMelement_isGarbage
+ * HTMelement_isGarbage
  * -- Can we deallocate?
  * =============================================================================
  */
 bool_t
+HTMelement_isGarbage (element_t* elementPtr)
+{
+    return HTM_SHARED_READ(elementPtr->isGarbage);
+}
+
+
+/* =============================================================================
+ * TMelement_isGarbage
+ * -- Can we deallocate?
+ * =============================================================================
+ */
+TM_CALLABLE
+bool_t
 TMelement_isGarbage (TM_ARGDECL  element_t* elementPtr)
 {
-    return (bool_t)TM_SHARED_READ(elementPtr->isGarbage);
+#if !defined(ORIGINAL) && defined(MERGE_ELEMENT)
+    TM_LOG_BEGIN(ELEM_ISGARBAGE, NULL, elementPtr);
+#endif /* !ORIGINAL && MERGE_ELEMENT */
+    bool_t rv = (bool_t)TM_SHARED_READ_TAG(elementPtr->isGarbage, elementPtr);
+#if !defined(ORIGINAL) && defined(MERGE_ELEMENT)
+    TM_LOG_END(ELEM_ISGARBAGE, &rv);
+#endif /* !ORIGINAL && MERGE_ELEMENT */
+    return rv;
 }
 
 
@@ -757,9 +865,21 @@ element_setIsGarbage (element_t* elementPtr, bool_t status)
 
 
 /* =============================================================================
+ * HTMelement_setIsGarbage
+ * =============================================================================
+ */
+void
+HTMelement_setIsGarbage (element_t* elementPtr, bool_t status)
+{
+    HTM_SHARED_WRITE(elementPtr->isGarbage, status);
+}
+
+
+/* =============================================================================
  * TMelement_setIsGarbage
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMelement_setIsGarbage (TM_ARGDECL  element_t* elementPtr, bool_t status)
 {
@@ -771,11 +891,23 @@ TMelement_setIsGarbage (TM_ARGDECL  element_t* elementPtr, bool_t status)
  * element_addNeighbor
  * =============================================================================
  */
-void
+bool_t
 element_addNeighbor (element_t* elementPtr, element_t* neighborPtr)
 {
-    list_insert(elementPtr->neighborListPtr, (void*)neighborPtr);
+    bool_t rv = list_insert(elementPtr->neighborListPtr, (void*)neighborPtr);
     assert(list_getSize(elementPtr->neighborListPtr) <= elementPtr->numEdge);
+    return rv;
+}
+
+
+/* =============================================================================
+ * HTMelement_addNeighbor
+ * =============================================================================
+ */
+bool_t
+HTMelement_addNeighbor (element_t* elementPtr, element_t* neighborPtr)
+{
+    return HTMLIST_INSERT(elementPtr->neighborListPtr, (void*)neighborPtr);
 }
 
 
@@ -783,10 +915,46 @@ element_addNeighbor (element_t* elementPtr, element_t* neighborPtr)
  * TMelement_addNeighbor
  * =============================================================================
  */
-void
+TM_CALLABLE
+bool_t
 TMelement_addNeighbor (TM_ARGDECL  element_t* elementPtr, element_t* neighborPtr)
 {
-    TMLIST_INSERT(elementPtr->neighborListPtr, (void*)neighborPtr);
+    return TMLIST_INSERT(elementPtr->neighborListPtr, (void*)neighborPtr);
+}
+
+
+
+/* =============================================================================
+ * element_removeNeighbor
+ * =============================================================================
+ */
+bool_t
+element_removeNeighbor (element_t* elementPtr, element_t* neighborPtr)
+{
+    return list_remove(elementPtr->neighborListPtr, neighborPtr);
+}
+
+
+/* =============================================================================
+ * HTMelement_removeNeighbor
+ * =============================================================================
+ */
+bool_t
+HTMelement_removeNeighbor (element_t* elementPtr, element_t* neighborPtr)
+{
+    return HTMLIST_REMOVE(elementPtr->neighborListPtr, neighborPtr);
+}
+
+
+/* =============================================================================
+ * TMelement_removeNeighbor
+ * =============================================================================
+ */
+TM_CALLABLE
+bool_t
+TMelement_removeNeighbor (TM_ARGDECL  element_t* elementPtr, element_t* neighborPtr)
+{
+    return TMLIST_REMOVE(elementPtr->neighborListPtr, neighborPtr);
 }
 
 
@@ -1012,3 +1180,65 @@ main (int argc, char* argv[])
  *
  * =============================================================================
  */
+
+#if !defined(ORIGINAL) && defined(MERGE_ELEMENT)
+stm_merge_t TMelement_merge(stm_merge_context_t *params) {
+    const stm_op_id_t op = stm_get_op_opcode(params->current);
+
+    if (STM_SAME_OPID(op, ELEM_ISGARBAGE) || STM_SAME_OPID(op, ELEM_ISREFERENCED)) {
+        ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+        const stm_read_t r = ENTRY_GET_READ(params->conflict.entries->e1);
+
+        const element_t *elementPtr = (const element_t *)TM_SHARED_GET_TAG(r);
+        ASSERT(elementPtr);
+        ASSERT(params->rv.sint == TRUE || params->rv.sint == FALSE);
+
+        ASSERT(!STM_VALID_OP(params->previous));
+        ASSERT(params->leaf == 1);
+        if (STM_SAME_OPID(op, ELEM_ISGARBAGE)) {
+            ASSERT(params->addr == &elementPtr->isGarbage);
+# ifdef TM_DEBUG
+            printf("\nELEM_ISGARBAGE addr:%p elementPtr:%p\n", params->addr, elementPtr);
+# endif
+            bool_t old, new;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, elementPtr->isGarbage, old));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, elementPtr->isGarbage, new));
+# ifdef TM_DEBUG
+            printf("ELEM_ISGARBAGE elementPtr->isGarbage:%p (old):%ld (new):%ld\n", &elementPtr->isGarbage, old, new);
+# endif
+            params->addr = elementPtr;
+            params->conflict.previous_result.sint = old;
+            params->rv.sint = new;
+            return STM_MERGE_OK;
+        } else if (STM_SAME_OPID(op, ELEM_ISREFERENCED)) {
+            ASSERT(params->addr == &elementPtr->isReferenced);
+# ifdef TM_DEBUG
+            printf("\nELEM_ISREFERENCED addr:%p elementPtr:%p\n", params->addr, elementPtr);
+# endif
+            bool_t old, new;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, elementPtr->isReferenced, old));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, elementPtr->isReferenced, new));
+# ifdef TM_DEBUG
+            printf("ELEM_ISREFERENCED elementPtr->isReferenced:%p (old):%ld (new):%ld\n", &elementPtr->isReferenced, old, new);
+# endif
+            params->addr = elementPtr;
+            params->conflict.previous_result.sint = old;
+            params->rv.sint = new;
+            return STM_MERGE_OK;
+        }
+    }
+
+# ifdef TM_DEBUG
+    printf("\nELEMENT_MERGE UNSUPPORTED addr:%p\n", params->addr);
+# endif
+    return STM_MERGE_UNSUPPORTED;
+}
+
+__attribute__((constructor)) void element_init() {
+    TM_LOG_FFI_DECLARE;
+    TM_LOG_TYPE_DECLARE_INIT(*p[], {&ffi_type_pointer});
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "element.inc"
+    #undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_ELEMENT */

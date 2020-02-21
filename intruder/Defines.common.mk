@@ -27,6 +27,7 @@ SRCS += \
 OBJS := ${SRCS:.c=.o}
 
 CFLAGS += -DMAP_USE_RBTREE
+CFLAGS += -DMERGE_LIST -DMERGE_QUEUE -DMERGE_RBTREE -DMERGE_DECODER -DMERGE_INTRUDER
 
 
 # ==============================================================================

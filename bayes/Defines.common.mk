@@ -27,6 +27,7 @@ OBJS := ${SRCS:.c=.o}
 CFLAGS += -DLIST_NO_DUPLICATES
 CFLAGS += -DLEARNER_TRY_REMOVE
 CFLAGS += -DLEARNER_TRY_REVERSE
+CFLAGS += -DMERGE_LIST -DMERGE_LEARNER
 
 
 # ==============================================================================

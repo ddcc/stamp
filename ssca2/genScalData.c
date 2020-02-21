@@ -91,6 +91,7 @@ static ULONGINT_T* global_startVertex        = NULL;
 static ULONGINT_T* global_endVertex          = NULL;
 static ULONGINT_T* global_tempIndex          = NULL;
 
+HTM_STATS_EXTERN(global_tsx_status);
 
 /* =============================================================================
  * genScalData_seq
@@ -808,11 +809,23 @@ genScalData (void* argPtr)
         long t1 = PRANDOM_GENERATE(stream);
         long t = i + t1 % (TOT_VERTICES - i);
         if (t != i) {
-            TM_BEGIN();
-            long t2 = (long)TM_SHARED_READ(permV[t]);
-            TM_SHARED_WRITE(permV[t], TM_SHARED_READ(permV[i]));
-            TM_SHARED_WRITE(permV[i], t2);
-            TM_END();
+            HTM_TX_INIT;
+tsx_begin_permv:
+            if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                HTM_LOCK_READ();
+                long t2 = (long)HTM_SHARED_READ(permV[t]);
+                HTM_SHARED_WRITE(permV[t], HTM_SHARED_READ(permV[i]));
+                HTM_SHARED_WRITE(permV[i], t2);
+                HTM_END(global_tsx_status);
+            } else {
+                HTM_RETRY(tsx_status, tsx_begin_permv);
+
+                TM_BEGIN();
+                long t2 = (long)TM_SHARED_READ(permV[t]);
+                TM_SHARED_WRITE(permV[t], TM_SHARED_READ(permV[i]));
+                TM_SHARED_WRITE(permV[i], t2);
+                TM_END();
+            }
         }
     }
 
@@ -1096,10 +1109,21 @@ genScalData (void* argPtr)
         }
     }
 
-    TM_BEGIN();
-    TM_SHARED_WRITE(global_edgeNum,
-                    ((long)TM_SHARED_READ(global_edgeNum) + i_edgePtr));
-    TM_END();
+    HTM_TX_INIT;
+tsx_begin_edge1:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        HTM_SHARED_WRITE(global_edgeNum,
+                        ((long)HTM_SHARED_READ(global_edgeNum) + i_edgePtr));
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_edge1);
+
+        TM_BEGIN();
+        TM_SHARED_WRITE(global_edgeNum,
+                        ((long)TM_SHARED_READ(global_edgeNum) + i_edgePtr));
+        TM_END();
+    }
 
     thread_barrier_wait();
 
@@ -1314,10 +1338,20 @@ genScalData (void* argPtr)
         }
     }
 
-    TM_BEGIN();
-    TM_SHARED_WRITE(global_edgeNum,
-                    ((long)TM_SHARED_READ(global_edgeNum) + i_edgePtr));
-    TM_END();
+tsx_begin_edge2:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        HTM_SHARED_WRITE(global_edgeNum,
+                        ((long)HTM_SHARED_READ(global_edgeNum) + i_edgePtr));
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_edge2);
+
+        TM_BEGIN();
+        TM_SHARED_WRITE(global_edgeNum,
+                        ((long)TM_SHARED_READ(global_edgeNum) + i_edgePtr));
+        TM_END();
+    }
 
 
     thread_barrier_wait();
@@ -1396,10 +1430,20 @@ genScalData (void* argPtr)
         }
     }
 
-    TM_BEGIN();
-    TM_SHARED_WRITE(global_numStrWtEdges,
-                    ((long)TM_SHARED_READ(global_numStrWtEdges) + numStrWtEdges));
-    TM_END();
+tsx_begin_numedge:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        HTM_SHARED_WRITE(global_numStrWtEdges,
+                        ((long)HTM_SHARED_READ(global_numStrWtEdges) + numStrWtEdges));
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_numedge);
+
+        TM_BEGIN();
+        TM_SHARED_WRITE(global_numStrWtEdges,
+                        ((long)TM_SHARED_READ(global_numStrWtEdges) + numStrWtEdges));
+        TM_END();
+    }
 
     thread_barrier_wait();
 

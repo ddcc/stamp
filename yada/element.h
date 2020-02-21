@@ -109,7 +109,7 @@ element_listCompare (const void* aPtr, const void* bPtr);
  * =============================================================================
  */
 long
-element_mapCompare (const pair_t* aPtr, const pair_t* bPtr);
+element_mapCompare (const void* aPtr, const void* bPtr);
 
 
 /* =============================================================================
@@ -133,11 +133,22 @@ Pelement_alloc (coordinate_t* coordinates, long numCoordinate);
 
 
 /* =============================================================================
+ * HTMelement_alloc
+ *
+ * Contains a copy of input arg 'coordinates'
+ * =============================================================================
+ */
+element_t*
+HTMelement_alloc (coordinate_t* coordinates, long numCoordinate);
+
+
+/* =============================================================================
  * TMelement_alloc
  *
  * Contains a copy of input arg 'coordinates'
  * =============================================================================
  */
+TM_CALLABLE
 element_t*
 TMelement_alloc (TM_ARGDECL  coordinate_t* coordinates, long numCoordinate);
 
@@ -159,9 +170,18 @@ Pelement_free (element_t* elementPtr);
 
 
 /* =============================================================================
+ * HTMelement_free
+ * =============================================================================
+ */
+void
+HTMelement_free (element_t* elementPtr);
+
+
+/* =============================================================================
  * TMelement_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMelement_free (TM_ARGDECL  element_t* elementPtr);
 
@@ -170,6 +190,7 @@ TMelement_free (TM_ARGDECL  element_t* elementPtr);
  * element_getNumEdge
  * =============================================================================
  */
+TM_PURE
 long
 element_getNumEdge (element_t* elementPtr);
 
@@ -180,6 +201,7 @@ element_getNumEdge (element_t* elementPtr);
  * Returned edgePtr is sorted; i.e., coordinate_compare(first, second) < 0
  * =============================================================================
  */
+TM_PURE
 edge_t*
 element_getEdge (element_t* elementPtr, long i);
 
@@ -201,7 +223,7 @@ element_listCompareEdge (const void* aPtr, const void* bPtr);
  * =============================================================================
  */
 long
-element_mapCompareEdge (const pair_t* aPtr, const pair_t* bPtr);
+element_mapCompareEdge (const void* aPtr, const void* bPtr);
 
 
 /* =============================================================================
@@ -218,6 +240,7 @@ element_heapCompare (const void* aPtr, const void* bPtr);
  * element_isInCircumCircle
  * =============================================================================
  */
+TM_PURE
 bool_t
 element_isInCircumCircle (element_t* elementPtr, coordinate_t* coordinatePtr);
 
@@ -226,6 +249,7 @@ element_isInCircumCircle (element_t* elementPtr, coordinate_t* coordinatePtr);
  * element_clearEncroached
  * =============================================================================
  */
+TM_PURE
 void
 element_clearEncroached (element_t* elementPtr);
 
@@ -234,6 +258,7 @@ element_clearEncroached (element_t* elementPtr);
  * element_getEncroachedPtr
  * =============================================================================
  */
+TM_PURE
 edge_t*
 element_getEncroachedPtr (element_t* elementPtr);
 
@@ -251,6 +276,7 @@ element_isSkinny (element_t* elementPtr);
  * -- Does it need to be refined?
  * =============================================================================
  */
+TM_PURE
 bool_t
 element_isBad (element_t* elementPtr);
 
@@ -261,6 +287,14 @@ element_isBad (element_t* elementPtr);
  */
 bool_t
 element_isReferenced (element_t* elementPtr);
+
+
+/* =============================================================================
+ * HTMelement_isReferenced
+ * =============================================================================
+ */
+bool_t
+HTMelement_isReferenced (element_t* elementPtr);
 
 
 /* =============================================================================
@@ -278,6 +312,14 @@ TMelement_isReferenced (TM_ARGDECL  element_t* elementPtr);
  */
 void
 element_setIsReferenced (element_t* elementPtr, bool_t status);
+
+
+/* =============================================================================
+ * HTMelement_setIsReferenced
+ * =============================================================================
+ */
+void
+HTMelement_setIsReferenced (element_t* elementPtr, bool_t status);
 
 
 /* =============================================================================
@@ -299,6 +341,15 @@ element_isGarbage (element_t* elementPtr);
 
 
 /* =============================================================================
+ * HTMelement_isGarbage
+ * -- Can we deallocate?
+ * =============================================================================
+ */
+bool_t
+HTMelement_isGarbage (element_t* elementPtr);
+
+
+/* =============================================================================
  * TMelement_isGarbage
  * -- Can we deallocate?
  * =============================================================================
@@ -317,6 +368,14 @@ element_setIsGarbage (element_t* elementPtr, bool_t status);
 
 
 /* =============================================================================
+ * HTMelement_setIsGarbage
+ * =============================================================================
+ */
+void
+HTMelement_setIsGarbage (element_t* elementPtr, bool_t status);
+
+
+/* =============================================================================
  * TMelement_setIsGarbage
  * =============================================================================
  */
@@ -329,22 +388,57 @@ TMelement_setIsGarbage (TM_ARGDECL  element_t* elementPtr, bool_t status);
  * element_addNeighbor
  * =============================================================================
  */
-void
+bool_t
 element_addNeighbor (element_t* elementPtr, element_t* neighborPtr);
+
+
+/* =============================================================================
+ * HTMelement_addNeighbor
+ * =============================================================================
+ */
+bool_t
+HTMelement_addNeighbor (element_t* elementPtr, element_t* neighborPtr);
 
 
 /* =============================================================================
  * TMelement_addNeighbor
  * =============================================================================
  */
-void
+TM_CALLABLE
+bool_t
 TMelement_addNeighbor (TM_ARGDECL  element_t* elementPtr, element_t* neighborPtr);
+
+
+/* =============================================================================
+ * element_removeNeighbor
+ * =============================================================================
+ */
+bool_t
+element_removeNeighbor (element_t* elementPtr, element_t* neighborPtr);
+
+
+/* =============================================================================
+ * HTMelement_removeNeighbor
+ * =============================================================================
+ */
+bool_t
+HTMelement_removeNeighbor (element_t* elementPtr, element_t* neighborPtr);
+
+
+/* =============================================================================
+ * TMelement_removeNeighbor
+ * =============================================================================
+ */
+TM_CALLABLE
+bool_t
+TMelement_removeNeighbor (TM_ARGDECL  element_t* elementPtr, element_t* neighborPtr);
 
 
 /* =============================================================================
  * element_getNeighborListPtr
  * =============================================================================
  */
+TM_PURE
 list_t*
 element_getNeighborListPtr (element_t* elementPtr);
 
@@ -354,6 +448,7 @@ element_getNeighborListPtr (element_t* elementPtr);
  * -- Returns pointer to aElementPtr's shared edge
  * =============================================================================
  */
+TM_PURE
 edge_t*
 element_getCommonEdge (element_t* aElementPtr, element_t* bElementPtr);
 
@@ -363,6 +458,7 @@ element_getCommonEdge (element_t* aElementPtr, element_t* bElementPtr);
  * -- Either the element is encroached or is skinny, so get the new point to add
  * =============================================================================
  */
+TM_PURE
 coordinate_t
 element_getNewPoint (element_t* elementPtr);
 
@@ -404,15 +500,35 @@ element_printAngles (element_t* elementPtr);
 #define PELEMENT_ALLOC(c, n)            Pelement_alloc(c, n)
 #define PELEMENT_FREE(e)                Pelement_free(e)
 
+#define ELEMENT_ALLOC(c, n)             element_alloc(c, n)
+#define ELEMENT_FREE(e)                 element_free(e)
+#define ELEMENT_ISREFERENCED(e)         element_isReferenced(e)
+#define ELEMENT_SETISREFERENCED(e, s)   element_setIsReferenced(e, s)
+#define ELEMENT_ISGARBAGE(e)            element_isGarbage(e)
+#define ELEMENT_SETISGARBAGE(e, s)      element_setIsGarbage(e, s)
+#define ELEMENT_ADDNEIGHBOR(e, n)       element_addNeighbor(e, n)
+#define ELEMENT_GETNEIGHBORLIST(e)      element_getNeighborListPtr(e)
+#define ELEMENT_REMOVENEIGHBOR(e, n)    element_removeNeighbor(e, n)
+
+#define HTMELEMENT_ALLOC(c, n)           HTMelement_alloc(c, n)
+#define HTMELEMENT_FREE(e)               HTMelement_free(e)
+#define HTMELEMENT_ISREFERENCED(e)       HTMelement_isReferenced(e)
+#define HTMELEMENT_SETISREFERENCED(e, s) HTMelement_setIsReferenced(e, s)
+#define HTMELEMENT_ISGARBAGE(e)          HTMelement_isGarbage(e)
+#define HTMELEMENT_SETISGARBAGE(e, s)    HTMelement_setIsGarbage(e, s)
+#define HTMELEMENT_ADDNEIGHBOR(e, n)     HTMelement_addNeighbor(e, n)
+#define HTMELEMENT_GETNEIGHBORLIST(e)    HTMelement_getNeighborListPtr(e)
+#define HTMELEMENT_REMOVENEIGHBOR(e, n)  HTMelement_removeNeighbor(e, n)
 
 #define TMELEMENT_ALLOC(c, n)           TMelement_alloc(TM_ARG  c, n)
-#define TMELEMENT_FREE(e)               /*TMelement_free(TM_ARG  e)*/
+#define TMELEMENT_FREE(e)               TMelement_free(TM_ARG  e)
 #define TMELEMENT_ISREFERENCED(e)       TMelement_isReferenced(TM_ARG  e)
 #define TMELEMENT_SETISREFERENCED(e, s) TMelement_setIsReferenced(TM_ARG  e, s)
 #define TMELEMENT_ISGARBAGE(e)          TMelement_isGarbage(TM_ARG  e)
 #define TMELEMENT_SETISGARBAGE(e, s)    TMelement_setIsGarbage(TM_ARG  e, s)
 #define TMELEMENT_ADDNEIGHBOR(e, n)     TMelement_addNeighbor(TM_ARG  e, n)
 #define TMELEMENT_GETNEIGHBORLIST(e)    TMelement_getNeighborListPtr(TM_ARG  e)
+#define TMELEMENT_REMOVENEIGHBOR(e, n)  TMelement_removeNeighbor(TM_ARG  e, n)
 
 
 #endif /* ELEMENT_H */

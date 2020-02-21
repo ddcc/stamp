@@ -81,21 +81,10 @@
 
 
 /* =============================================================================
- * compareReservationInfo
- * =============================================================================
- */
-static long
-compareReservationInfo (const void* aPtr, const void* bPtr)
-{
-    return reservation_info_compare((reservation_info_t*)aPtr,
-                                    (reservation_info_t*)bPtr);
-}
-
-
-/* =============================================================================
  * customer_alloc
  * =============================================================================
  */
+TM_CALLABLE
 customer_t*
 customer_alloc (TM_ARGDECL  long id)
 {
@@ -106,7 +95,24 @@ customer_alloc (TM_ARGDECL  long id)
 
     customerPtr->id = id;
 
-    customerPtr->reservationInfoListPtr = TMLIST_ALLOC(&compareReservationInfo);
+    customerPtr->reservationInfoListPtr = TMLIST_ALLOC((long int (*)(const void *, const void *))&reservation_info_compare);
+    assert(customerPtr->reservationInfoListPtr != NULL);
+
+    return customerPtr;
+}
+
+
+customer_t*
+HTMcustomer_alloc (long id)
+{
+    customer_t* customerPtr;
+
+    customerPtr = (customer_t*)HTM_MALLOC(sizeof(customer_t));
+    assert(customerPtr != NULL);
+
+    customerPtr->id = id;
+
+    customerPtr->reservationInfoListPtr = HTMLIST_ALLOC((long int (*)(const void *, const void *))&reservation_info_compare);
     assert(customerPtr->reservationInfoListPtr != NULL);
 
     return customerPtr;
@@ -123,7 +129,7 @@ customer_alloc_seq (long id)
 
     customerPtr->id = id;
 
-    customerPtr->reservationInfoListPtr = list_alloc(&compareReservationInfo);
+    customerPtr->reservationInfoListPtr = list_alloc((long int (*)(const void *, const void *))&reservation_info_compare);
     assert(customerPtr->reservationInfoListPtr != NULL);
 
     return customerPtr;
@@ -146,6 +152,7 @@ customer_compare (customer_t* aPtr, customer_t* bPtr)
  * customer_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 customer_free (TM_ARGDECL  customer_t* customerPtr)
 {
@@ -155,11 +162,15 @@ customer_free (TM_ARGDECL  customer_t* customerPtr)
     TM_FREE(customerPtr);
 }
 
+void
+HTMcustomer_free (customer_t* customerPtr)
+{
+    list_t* reservationInfoListPtr =
+        (list_t*)HTM_SHARED_READ_P(customerPtr->reservationInfoListPtr);
+    HTMLIST_FREE(reservationInfoListPtr, NULL);
+    HTM_FREE(customerPtr);
+}
 
-/* =============================================================================
- * customer_free_seq
- * =============================================================================
- */
 void
 customer_free_seq (customer_t* customerPtr)
 {
@@ -173,6 +184,7 @@ customer_free_seq (customer_t* customerPtr)
  * -- Returns TRUE if success, else FALSE
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 customer_addReservationInfo (TM_ARGDECL
                              customer_t* customerPtr,
@@ -189,12 +201,43 @@ customer_addReservationInfo (TM_ARGDECL
     return TMLIST_INSERT(reservationInfoListPtr, (void*)reservationInfoPtr);
 }
 
+bool_t
+HTMcustomer_addReservationInfo (customer_t* customerPtr,
+                             reservation_type_t type, long id, long price)
+{
+    reservation_info_t* reservationInfoPtr;
+
+    reservationInfoPtr = HTMRESERVATION_INFO_ALLOC(type, id, price);
+    assert(reservationInfoPtr != NULL);
+
+    list_t* reservationInfoListPtr =
+        (list_t*)HTM_SHARED_READ(customerPtr->reservationInfoListPtr);
+
+    return HTMLIST_INSERT(reservationInfoListPtr, (void*)reservationInfoPtr);
+}
+
+bool_t
+customer_addReservationInfo_seq (
+                             customer_t* customerPtr,
+                             reservation_type_t type, long id, long price)
+{
+    reservation_info_t* reservationInfoPtr;
+
+    reservationInfoPtr = RESERVATION_INFO_ALLOC_SEQ(type, id, price);
+    assert(reservationInfoPtr != NULL);
+
+    list_t* reservationInfoListPtr = customerPtr->reservationInfoListPtr;
+
+    return LIST_INSERT(reservationInfoListPtr, (void*)reservationInfoPtr);
+}
+
 
 /* =============================================================================
  * customer_removeReservationInfo
  * -- Returns TRUE if success, else FALSE
  * =============================================================================
  */
+TM_CANCELLABLE
 bool_t
 customer_removeReservationInfo (TM_ARGDECL
                                 customer_t* customerPtr,
@@ -234,6 +277,7 @@ customer_removeReservationInfo (TM_ARGDECL
  * -- Returns total cost of reservations
  * =============================================================================
  */
+TM_CALLABLE
 long
 customer_getBill (TM_ARGDECL  customer_t* customerPtr)
 {
@@ -250,6 +294,54 @@ customer_getBill (TM_ARGDECL  customer_t* customerPtr)
     }
 
     return bill;
+}
+
+
+long
+HTMcustomer_getBill (customer_t* customerPtr)
+{
+    long bill = 0;
+    list_iter_t it;
+    list_t* reservationInfoListPtr =
+        (list_t*)HTM_SHARED_READ(customerPtr->reservationInfoListPtr);
+
+    HTMLIST_ITER_RESET(&it, reservationInfoListPtr);
+    while (HTMLIST_ITER_HASNEXT(&it, reservationInfoListPtr)) {
+        reservation_info_t* reservationInfoPtr =
+            (reservation_info_t*)HTMLIST_ITER_NEXT(&it, reservationInfoListPtr);
+        bill += reservationInfoPtr->price;
+    }
+
+    return bill;
+}
+
+
+long
+customer_getBill_seq (customer_t* customerPtr)
+{
+    long bill = 0;
+    list_iter_t it;
+    list_t* reservationInfoListPtr = customerPtr->reservationInfoListPtr;
+
+    LIST_ITER_RESET(&it, reservationInfoListPtr);
+    while (LIST_ITER_HASNEXT(&it, reservationInfoListPtr)) {
+        reservation_info_t* reservationInfoPtr =
+            (reservation_info_t*)LIST_ITER_NEXT(&it, reservationInfoListPtr);
+        bill += reservationInfoPtr->price;
+    }
+
+    return bill;
+}
+
+
+/* =============================================================================
+ * customer_setCompare
+ * =============================================================================
+ */
+void
+customer_setCompare (long id, customer_t *customerPtr)
+{
+    list_setCompare(customerPtr->reservationInfoListPtr, (long int (*)(const void *, const void *))&reservation_info_compare);
 }
 
 

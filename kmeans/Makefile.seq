@@ -5,7 +5,7 @@
 # ==============================================================================
 
 
-include ../common/Defines.common.mk
+include ../common/Defines.common.seq.mk
 include ./Defines.common.mk
 include ../common/Makefile.seq
 

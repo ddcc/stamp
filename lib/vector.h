@@ -94,6 +94,7 @@ typedef struct vector {
  * -- Returns NULL if failed
  * =============================================================================
  */
+TM_PURE
 vector_t*
 vector_alloc (long initCapacity);
 
@@ -103,8 +104,18 @@ vector_alloc (long initCapacity);
  * -- Returns NULL if failed
  * =============================================================================
  */
+TM_PURE
 vector_t*
 Pvector_alloc (long initCapacity);
+
+
+/* =============================================================================
+ * HTMvector_alloc
+ * -- Returns NULL if failed
+ * =============================================================================
+ */
+vector_t*
+HTMvector_alloc (long initCapacity);
 
 
 /* =============================================================================
@@ -112,14 +123,15 @@ Pvector_alloc (long initCapacity);
  * -- Returns NULL if failed
  * =============================================================================
  */
+TM_CALLABLE
 vector_t*
 TMvector_alloc (long initCapacity);
-
 
 /* =============================================================================
  * vector_free
  * =============================================================================
  */
+TM_PURE
 void
 vector_free (vector_t* vectorPtr);
 
@@ -128,6 +140,7 @@ vector_free (vector_t* vectorPtr);
  * Pvector_free
  * =============================================================================
  */
+TM_PURE
 void
 Pvector_free (vector_t* vectorPtr);
 
@@ -137,6 +150,7 @@ Pvector_free (vector_t* vectorPtr);
  * -- Returns NULL if failed
  * =============================================================================
  */
+TM_PURE
 void*
 vector_at (vector_t* vectorPtr, long i);
 
@@ -146,6 +160,7 @@ vector_at (vector_t* vectorPtr, long i);
  * -- Returns FALSE if fail, else TRUE
  * =============================================================================
  */
+TM_PURE
 bool_t
 vector_pushBack (vector_t* vectorPtr, void* dataPtr);
 
@@ -155,8 +170,18 @@ vector_pushBack (vector_t* vectorPtr, void* dataPtr);
  * -- Returns FALSE if fail, else TRUE
  * =============================================================================
  */
+TM_PURE
 bool_t
 Pvector_pushBack (vector_t* vectorPtr, void* dataPtr);
+
+
+/* =============================================================================
+ * HTMvector_pushBack
+ * -- Returns FALSE if fail, else TRUE
+ * =============================================================================
+ */
+bool_t
+HTMvector_pushBack (vector_t* vectorPtr, void* dataPtr);
 
 
 /* =============================================================================
@@ -164,6 +189,7 @@ Pvector_pushBack (vector_t* vectorPtr, void* dataPtr);
  * -- Returns FALSE if fail, else TRUE
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMvector_pushBack (vector_t* vectorPtr, void* dataPtr);
 
@@ -173,6 +199,7 @@ TMvector_pushBack (vector_t* vectorPtr, void* dataPtr);
  * -- Returns NULL if fail, else returns last element
  * =============================================================================
  */
+TM_PURE
 void*
 vector_popBack (vector_t* vectorPtr);
 
@@ -181,6 +208,7 @@ vector_popBack (vector_t* vectorPtr);
  * vector_getSize
  * =============================================================================
  */
+TM_PURE
 long
 vector_getSize (vector_t* vectorPtr);
 
@@ -189,6 +217,7 @@ vector_getSize (vector_t* vectorPtr);
  * vector_clear
  * =============================================================================
  */
+TM_PURE
 void
 vector_clear (vector_t* vectorPtr);
 
@@ -197,6 +226,7 @@ vector_clear (vector_t* vectorPtr);
  * vector_sort
  * =============================================================================
  */
+TM_PURE
 void
 vector_sort (vector_t* vectorPtr, int (*compare) (const void*, const void*));
 
@@ -205,6 +235,7 @@ vector_sort (vector_t* vectorPtr, int (*compare) (const void*, const void*));
  * vector_copy
  * =============================================================================
  */
+TM_PURE
 bool_t
 vector_copy (vector_t* dstVectorPtr, vector_t* srcVectorPtr);
 
@@ -213,9 +244,13 @@ vector_copy (vector_t* dstVectorPtr, vector_t* srcVectorPtr);
  * Pvector_copy
  * =============================================================================
  */
+TM_PURE
 bool_t
 Pvector_copy (vector_t* dstVectorPtr, vector_t* srcVectorPtr);
 
+
+#define VECTOR_ALLOC(n)             vector_alloc(n)
+#define VECTOR_PUSHBACK(v, data)    vector_pushBack(v, data)
 
 #define PVECTOR_ALLOC(n)            Pvector_alloc(n)
 #define PVECTOR_FREE                Pvector_free
@@ -226,6 +261,9 @@ Pvector_copy (vector_t* dstVectorPtr, vector_t* srcVectorPtr);
 #define PVECTOR_CLEAR(v)            vector_clear(v)
 #define PVECTOR_SORT(v, cmp)        vector_sort(v, cmp)
 #define PVECTOR_COPY(dst, src)      Pvector_copy(dst, src)
+
+#define HTMVECTOR_ALLOC(n)          HTMvector_alloc(n)
+#define HTMVECTOR_PUSHBACK(v, data) HTMvector_pushBack(v, data)
 
 #define TMVECTOR_ALLOC(n)           TMvector_alloc(n)
 #define TMVECTOR_PUSHBACK(v, data)  TMvector_pushBack(v, data)

@@ -104,10 +104,20 @@ Ppair_alloc (void* firstPtr, void* secondPtr);
 
 
 /* =============================================================================
+ * HTMpair_alloc
+ * -- Returns NULL if failure
+ * =============================================================================
+ */
+pair_t*
+HTMpair_alloc (void* firstPtr, void* secondPtr);
+
+
+/* =============================================================================
  * TMpair_alloc
  * -- Returns NULL if failure
  * =============================================================================
  */
+TM_CALLABLE
 pair_t*
 TMpair_alloc (TM_ARGDECL  void* firstPtr, void* secondPtr);
 
@@ -129,9 +139,18 @@ Ppair_free (pair_t* pairPtr);
 
 
 /* =============================================================================
+ * HTMpair_free
+ * =============================================================================
+ */
+void
+HTMpair_free (pair_t* pairPtr);
+
+
+/* =============================================================================
  * TMpair_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMpair_free (TM_ARGDECL  pair_t* pairPtr);
 
@@ -147,6 +166,9 @@ pair_swap (pair_t* pairPtr);
 
 #define PPAIR_ALLOC(f,s)    Ppair_alloc(f, s)
 #define PPAIR_FREE(p)       Ppair_free(p)
+
+#define HTMPAIR_ALLOC(f,s)  HTMpair_alloc(f, s)
+#define HTMPAIR_FREE        HTMpair_free
 
 #define TMPAIR_ALLOC(f,s)   TMpair_alloc(TM_ARG  f, s)
 #define TMPAIR_FREE         TMpair_free

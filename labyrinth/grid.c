@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -184,7 +184,7 @@ grid_copy (grid_t* dstGridPtr, grid_t* srcGridPtr)
     for (i = 0; i < n; i+=i_step) {
         TM_EARLY_RELEASE(srcPoints[i]); /* releases entire line */
     }
-#endif
+#endif /* USE_EARLY_RELEASE */
 }
 
 
@@ -303,9 +303,31 @@ grid_addPath (grid_t* gridPtr, vector_t* pointVectorPtr)
 
 
 /* =============================================================================
+ * HTMgrid_addPath
+ * =============================================================================
+ */
+void
+HTMgrid_addPath (grid_t* gridPtr, vector_t* pointVectorPtr)
+{
+    long i;
+    long n = vector_getSize(pointVectorPtr);
+
+    for (i = 1; i < (n-1); i++) {
+        long* gridPointPtr = (long*)vector_at(pointVectorPtr, i);
+        long value = (long)HTM_SHARED_READ(*gridPointPtr);
+        if (value != GRID_POINT_EMPTY) {
+            HTM_RESTART();
+        }
+        HTM_SHARED_WRITE(*gridPointPtr, GRID_POINT_FULL);
+    }
+}
+
+
+/* =============================================================================
  * TMgrid_addPath
  * =============================================================================
  */
+TM_CANCELLABLE
 void
 TMgrid_addPath (TM_ARGDECL  grid_t* gridPtr, vector_t* pointVectorPtr)
 {

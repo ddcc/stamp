@@ -114,6 +114,13 @@ typedef struct arg {
     vector_t** errorVectors;
 } arg_t;
 
+#if !defined(ORIGINAL) && defined(MERGE_INTRUDER)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "intruder.inc"
+# undef TM_LOG_OP
+#endif /* !ORIGINAL && MERGE_INTRUDER */
+
+HTM_STATS_EXTERN(global_tsx_status);
 
 /* =============================================================================
  * displayUsage
@@ -187,6 +194,53 @@ processPackets (void* argPtr)
     decoder_t*  decoderPtr   = ((arg_t*)argPtr)->decoderPtr;
     vector_t**  errorVectors = ((arg_t*)argPtr)->errorVectors;
 
+    char *bytes, *data;
+
+#if !defined(ORIGINAL) && defined(MERGE_INTRUDER)
+    stm_merge_t merge(stm_merge_context_t *params) {
+#ifdef MERGE_QUEUE
+        extern const stm_op_id_t QUEUE_POP;
+#endif /* MERGE_QUEUE */
+#ifdef MERGE_DECODER
+        extern const stm_op_id_t DEC_GETCOMPLETE;
+#endif /* MERGE_DECODER */
+        const stm_op_id_t prev_op = params->leaf ? STM_INVALID_OPID : stm_get_op_opcode(params->previous);
+
+        /* Just-in-time merge */
+        ASSERT(STM_SAME_OP(stm_get_current_op(), params->current));
+
+#ifdef TM_DEBUG
+        printf("\nINTRUDER_JIT addr:%p streamPtr:%p decoderPtr:%p\n", params->addr, streamPtr, decoderPtr);
+#endif
+
+        /* Update from QUEUE_POP or DEC_GETCOMPLETE to INTRUDER_PACKET */
+        ASSERT(STM_SAME_OPID(stm_get_op_opcode(params->current), INTRUDER_PACKET));
+        if (0) {
+#ifdef MERGE_DECODER
+        } else if (STM_SAME_OPID(prev_op, DEC_GETCOMPLETE)) {
+# ifdef TM_DEBUG
+            printf("INTRUDER_JIT <- DEC_GETCOMPLETE %p\n", params->conflict.result.ptr);
+# endif
+            data = params->conflict.result.ptr;
+            return STM_MERGE_OK;
+#endif /* MERGE_DECODER */
+#ifdef MERGE_QUEUE
+        } else if (STM_SAME_OPID(prev_op, QUEUE_POP)) {
+# ifdef TM_DEBUG
+            printf("INTRUDER_JIT <- QUEUE_POP %p\n", params->conflict.result.ptr);
+# endif
+            bytes = params->conflict.result.ptr;
+            return STM_MERGE_OK;
+#endif /* MERGE_QUEUE */
+        }
+
+#ifdef TM_DEBUG
+        printf("\nINTRUDER_JIT UNSUPPORTED addr:%p\n", params->addr);
+#endif
+        return STM_MERGE_UNSUPPORTED;
+    }
+#endif /* !ORIGINAL && MERGE_INTRUDER */
+
     detector_t* detectorPtr = PDETECTOR_ALLOC();
     assert(detectorPtr);
     PDETECTOR_ADDPREPROCESSOR(detectorPtr, &preprocessor_toLower);
@@ -194,11 +248,25 @@ processPackets (void* argPtr)
     vector_t* errorVectorPtr = errorVectors[threadId];
 
     while (1) {
+        HTM_TX_INIT;
+tsx_begin_getpacket:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            bytes = HTMSTREAM_GETPACKET(streamPtr);
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_getpacket);
 
-        char* bytes;
-        TM_BEGIN();
-        bytes = TMSTREAM_GETPACKET(streamPtr);
-        TM_END();
+            TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_INTRUDER)
+            TM_LOG_BEGIN(INTRUDER_PACKET, merge);
+#endif /* !ORIGINAL && MERGE_INTRUDER */
+            bytes = TMSTREAM_GETPACKET(streamPtr);
+            /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+            // TM_LOG_END(INTRUDER_PACKET, NULL);
+            TM_END();
+        }
+
         if (!bytes) {
             break;
         }
@@ -207,11 +275,9 @@ processPackets (void* argPtr)
         long flowId = packetPtr->flowId;
 
         error_t error;
-        TM_BEGIN();
         error = TMDECODER_PROCESS(decoderPtr,
                                   bytes,
                                   (PACKET_HEADER_LENGTH + packetPtr->length));
-        TM_END();
         if (error) {
             /*
              * Currently, stream_generate() does not create these errors.
@@ -221,11 +287,25 @@ processPackets (void* argPtr)
             assert(status);
         }
 
-        char* data;
         long decodedFlowId;
-        TM_BEGIN();
-        data = TMDECODER_GETCOMPLETE(decoderPtr, &decodedFlowId);
-        TM_END();
+tsx_begin_getcomplete:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            data = HTMDECODER_GETCOMPLETE(decoderPtr, &decodedFlowId);
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_getcomplete);
+
+            TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_INTRUDER)
+            TM_LOG_BEGIN(INTRUDER_PACKET, merge);
+#endif /* !ORIGINAL && MERGE_INTRUDER */
+            data = TMDECODER_GETCOMPLETE(decoderPtr, &decodedFlowId);
+            /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+            // TM_LOG_END(INTRUDER_PACKET, NULL);
+            TM_END();
+        }
+
         if (data) {
             error_t error = PDETECTOR_PROCESS(detectorPtr, data);
             P_FREE(data);
@@ -321,6 +401,8 @@ MAIN(argc, argv)
     TIMER_READ(stopTime);
     printf("Processing time = %f\n", TIMER_DIFF_SECONDS(startTime, stopTime));
 
+    HTM_STATS_PRINT(global_tsx_status);
+
     /*
      * Check solution
      */
@@ -384,3 +466,12 @@ out:
  *
  * =============================================================================
  */
+
+#if !defined(ORIGINAL) && defined(MERGE_INTRUDER)
+__attribute__((constructor)) void intruder_init() {
+    TM_LOG_FFI_DECLARE;
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "intruder.inc"
+    #undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_INTRUDER */

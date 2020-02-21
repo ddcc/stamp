@@ -101,6 +101,9 @@ char* global_inputFile = NULL;
 long global_params[256]; /* 256 = ascii limit */
 
 
+HTM_STATS(global_tsx_status);
+
+
 /* =============================================================================
  * displayUsage
  * =============================================================================
@@ -250,6 +253,8 @@ MAIN(argc, argv)
     }
     printf("Paths routed    = %li\n", numPathRouted);
     printf("Solve time = %f\n", TIMER_DIFF_SECONDS(startTime, stopTime));
+
+    HTM_STATS_PRINT(global_tsx_status);
 
     /*
      * Check solution and clean up

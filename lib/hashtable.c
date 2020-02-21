@@ -23,48 +23,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -96,6 +96,11 @@
 #  warning "hash table resizing currently disabled for TM"
 #endif
 
+#ifndef ORIGINAL
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "hashtable.inc"
+# undef TM_LOG_OP
+#endif /* ORIGINAL */
 
 /* =============================================================================
  * hashtable_iter_reset
@@ -113,6 +118,7 @@ hashtable_iter_reset (hashtable_iter_t* itPtr, hashtable_t* hashtablePtr)
  * TMhashtable_iter_reset
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMhashtable_iter_reset (TM_ARGDECL
                         hashtable_iter_t* itPtr, hashtable_t* hashtablePtr)
@@ -151,6 +157,7 @@ hashtable_iter_hasNext (hashtable_iter_t* itPtr, hashtable_t* hashtablePtr)
  * hashtable_iter_hasNext
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_iter_hasNext (TM_ARGDECL
                           hashtable_iter_t* itPtr, hashtable_t* hashtablePtr)
@@ -208,6 +215,7 @@ hashtable_iter_next (hashtable_iter_t* itPtr, hashtable_t* hashtablePtr)
  * TMhashtable_iter_next
  * =============================================================================
  */
+TM_CALLABLE
 void*
 TMhashtable_iter_next (TM_ARGDECL
                        hashtable_iter_t* itPtr, hashtable_t* hashtablePtr)
@@ -292,7 +300,7 @@ TMallocBuckets (TM_ARGDECL
             TMLIST_ALLOC((long (*)(const void*, const void*))comparePairs);
         if (chainPtr == NULL) {
             while (--i >= 0) {
-                TMLIST_FREE(buckets[i], (void (*)(void *))TMPAIR_FREE);
+                TMLIST_FREE(buckets[i], (TM_CALLABLE void (*)(void *))TMPAIR_FREE);
             }
             return NULL;
         }
@@ -350,6 +358,7 @@ hashtable_alloc (long initNumBucket,
  * -- Negative values for resizeRatio or growthFactor select default values
  * =============================================================================
  */
+TM_CALLABLE
 hashtable_t*
 TMhashtable_alloc (TM_ARGDECL
                    long initNumBucket,
@@ -360,15 +369,18 @@ TMhashtable_alloc (TM_ARGDECL
 {
     hashtable_t* hashtablePtr;
 
+#ifndef ORIGINAL
+    TM_LOG_BEGIN(HSTB_ALLOC, NULL, initNumBucket, hash, comparePairs, resizeRatio, growthFactor);
+#endif /* ORIGINAL */
     hashtablePtr = (hashtable_t*)TM_MALLOC(sizeof(hashtable_t));
-    if (hashtablePtr == NULL) {
-        return NULL;
-    }
+    if (hashtablePtr == NULL)
+        goto out;
 
     hashtablePtr->buckets = TMallocBuckets(TM_ARG  initNumBucket, comparePairs);
     if (hashtablePtr->buckets == NULL) {
         TM_FREE(hashtablePtr);
-        return NULL;
+        hashtablePtr = NULL;
+        goto out;
     }
 
     hashtablePtr->numBucket = initNumBucket;
@@ -382,6 +394,10 @@ TMhashtable_alloc (TM_ARGDECL
     hashtablePtr->growthFactor = ((growthFactor < 0) ?
                                   HASHTABLE_DEFAULT_GROWTH_FACTOR : growthFactor);
 
+out:
+#ifndef ORIGINAL
+    TM_LOG_END(HSTB_ALLOC, &hashtablePtr);
+#endif /* ORIGINAL */
     return hashtablePtr;
 }
 
@@ -413,7 +429,7 @@ TMfreeBuckets (TM_ARGDECL  list_t** buckets, long numBucket)
     long i;
 
     for (i = 0; i < numBucket; i++) {
-        TMLIST_FREE(buckets[i], (void (*)(void *))TMPAIR_FREE);
+        TMLIST_FREE(buckets[i], (TM_CALLABLE void (*)(void *))TMPAIR_FREE);
     }
 
     TM_FREE(buckets);
@@ -436,11 +452,18 @@ hashtable_free (hashtable_t* hashtablePtr)
  * TMhashtable_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMhashtable_free (TM_ARGDECL  hashtable_t* hashtablePtr)
 {
+#ifndef ORIGINAL
+    TM_LOG_BEGIN(HSTB_FREE, NULL, hashtablePtr);
+#endif /* ORIGINAL */
     TMfreeBuckets(TM_ARG  hashtablePtr->buckets, hashtablePtr->numBucket);
     TM_FREE(hashtablePtr);
+#ifndef ORIGINAL
+    TM_LOG_END(HSTB_FREE, NULL);
+#endif /* ORIGINAL */
 }
 
 
@@ -471,6 +494,7 @@ hashtable_isEmpty (hashtable_t* hashtablePtr)
  * TMhashtable_isEmpty
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_isEmpty (TM_ARGDECL  hashtable_t* hashtablePtr)
 {
@@ -518,6 +542,7 @@ hashtable_getSize (hashtable_t* hashtablePtr)
  * -- Returns number of elements in hash table
  * =============================================================================
  */
+TM_CALLABLE
 long
 TMhashtable_getSize (TM_ARGDECL  hashtable_t* hashtablePtr)
 {
@@ -558,17 +583,26 @@ hashtable_containsKey (hashtable_t* hashtablePtr, void* keyPtr)
  * TMhashtable_containsKey
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_containsKey (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr)
 {
     long i = hashtablePtr->hash(keyPtr) % hashtablePtr->numBucket;
     pair_t* pairPtr;
     pair_t findPair;
+    bool_t rv;
 
+#ifndef ORIGINAL
+    TM_LOG_BEGIN(HSTB_CONTAINS, NULL, hashtablePtr, keyPtr);
+#endif /* ORIGINAL */
     findPair.firstPtr = keyPtr;
     pairPtr = (pair_t*)TMLIST_FIND(hashtablePtr->buckets[i], &findPair);
 
-    return ((pairPtr != NULL) ? TRUE : FALSE);
+    rv = (pairPtr != NULL) ? TRUE : FALSE;
+#ifndef ORIGINAL
+    TM_LOG_END(HSTB_CONTAINS, &rv);
+#endif /* ORIGINAL */
+    return rv;
 }
 
 
@@ -599,20 +633,46 @@ hashtable_find (hashtable_t* hashtablePtr, void* keyPtr)
  * -- Returns NULL on failure, else pointer to data associated with key
  * =============================================================================
  */
+TM_CALLABLE
 void*
 TMhashtable_find (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr)
 {
     long i = hashtablePtr->hash(keyPtr) % hashtablePtr->numBucket;
-    pair_t* pairPtr;
-    pair_t findPair;
+    void *rv;
 
-    findPair.firstPtr = keyPtr;
-    pairPtr = (pair_t*)TMLIST_FIND(hashtablePtr->buckets[i], &findPair);
-    if (pairPtr == NULL) {
-        return NULL;
+#ifndef ORIGINAL
+    TM_LOG_BEGIN(HSTB_FIND, NULL, hashtablePtr, keyPtr);
+#endif /* ORIGINAL */
+    /* Stack-allocated pair_t will no longer be accessible after this function has gone out of scope */
+
+#if defined(MERGE_HASHTABLE) || defined(MERGE_LIST)
+    pair_t* findPtr = TMPAIR_ALLOC(keyPtr, NULL);
+    if (findPtr == NULL) {
+        rv = NULL;
+        goto out;
     }
 
-    return pairPtr->secondPtr;
+    pair_t* pairPtr = (pair_t*)TMLIST_FIND(hashtablePtr->buckets[i], findPtr);
+    if (pairPtr == NULL) {
+        TMPAIR_FREE(findPtr);
+        rv = NULL;
+        goto out;
+    }
+#else
+    pair_t findPair;
+    findPair.firstPtr = keyPtr;
+    pair_t* pairPtr = (pair_t*)TMLIST_FIND(hashtablePtr->buckets[i], &findPair);
+    if (pairPtr == NULL) {
+        rv = NULL;
+        goto out;
+    }
+#endif /* MERGE_HASHTABLE || MERGE_LIST */
+    rv = pairPtr->secondPtr;
+out:
+#ifndef ORIGINAL
+    TM_LOG_END(HSTB_FIND, &rv);
+#endif /* ORIGINAL */
+    return rv;
 }
 
 
@@ -716,41 +776,115 @@ hashtable_insert (hashtable_t* hashtablePtr, void* keyPtr, void* dataPtr)
 
 
 /* =============================================================================
+ * HTMhashtable_insert
+ * =============================================================================
+ */
+bool_t
+HTMhashtable_insert (hashtable_t* hashtablePtr, void* keyPtr, void* dataPtr)
+{
+    long numBucket = hashtablePtr->numBucket;
+    long i = hashtablePtr->hash(keyPtr) % numBucket;
+    bool_t rv;
+
+    /* Stack-allocated pair_t will no longer be accessible after this function has gone out of scope */
+    pair_t findPair;
+    findPair.firstPtr = keyPtr;
+    pair_t* pairPtr = (pair_t*)HTMLIST_FIND(hashtablePtr->buckets[i], &findPair);
+    if (pairPtr != NULL) {
+        rv = FALSE;
+        goto out;
+    }
+
+    pair_t* insertPtr = HTMPAIR_ALLOC(keyPtr, dataPtr);
+    if (insertPtr == NULL) {
+        rv = FALSE;
+        goto out;
+    }
+
+    /* Add new entry  */
+    if (HTMLIST_INSERT(hashtablePtr->buckets[i], insertPtr) == FALSE) {
+        HTMPAIR_FREE(insertPtr);
+        rv = FALSE;
+        goto out;
+    }
+
+#ifdef HASHTABLE_SIZE_FIELD
+    long newSize = HTM_SHARED_READ(hashtablePtr->size) + 1;
+    assert(newSize > 0);
+    HTM_SHARED_WRITE(hashtablePtr->size, newSize);
+#endif
+
+    rv = TRUE;
+out:
+    return rv;
+}
+
+
+/* =============================================================================
  * TMhashtable_insert
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_insert (TM_ARGDECL
                     hashtable_t* hashtablePtr, void* keyPtr, void* dataPtr)
 {
     long numBucket = hashtablePtr->numBucket;
     long i = hashtablePtr->hash(keyPtr) % numBucket;
+    bool_t rv;
 
+#ifndef ORIGINAL
+    TM_LOG_BEGIN(HSTB_INSERT, NULL, hashtablePtr, keyPtr, dataPtr);
+#endif /* ORIGINAL */
+    /* Stack-allocated pair_t will no longer be accessible after this function has gone out of scope */
+#if defined(MERGE_HASHTABLE) || defined(MERGE_LIST)
+    pair_t* insertPtr = TMPAIR_ALLOC(keyPtr, dataPtr);
+    if (insertPtr == NULL) {
+        rv = FALSE;
+        goto out;
+    }
+
+    pair_t* pairPtr = (pair_t*)TMLIST_FIND(hashtablePtr->buckets[i], insertPtr);
+    if (pairPtr != NULL) {
+        TMPAIR_FREE(insertPtr);
+        rv = FALSE;
+        goto out;
+    }
+#else
     pair_t findPair;
     findPair.firstPtr = keyPtr;
     pair_t* pairPtr = (pair_t*)TMLIST_FIND(hashtablePtr->buckets[i], &findPair);
     if (pairPtr != NULL) {
-        return FALSE;
+        rv = FALSE;
+        goto out;
     }
 
     pair_t* insertPtr = TMPAIR_ALLOC(keyPtr, dataPtr);
     if (insertPtr == NULL) {
-        return FALSE;
+        rv = FALSE;
+        goto out;
     }
+#endif /* MERGE_HASHTABLE || MERGE_LIST */
 
     /* Add new entry  */
     if (TMLIST_INSERT(hashtablePtr->buckets[i], insertPtr) == FALSE) {
         TMPAIR_FREE(insertPtr);
-        return FALSE;
+        rv = FALSE;
+        goto out;
     }
 
 #ifdef HASHTABLE_SIZE_FIELD
-    long newSize = TM_SHARED_READ(hashtablePtr->size) + 1;
+    long newSize = TM_SHARED_READ_TAG(hashtablePtr->size, hashtablePtr) + 1;
     assert(newSize > 0);
     TM_SHARED_WRITE(hashtablePtr->size, newSize);
 #endif
 
-    return TRUE;
+    rv = TRUE;
+out:
+#ifndef ORIGINAL
+    TM_LOG_END(HSTB_INSERT, &rv);
+#endif /* ORIGINAL */
+    return rv;
 }
 
 
@@ -792,6 +926,7 @@ hashtable_remove (hashtable_t* hashtablePtr, void* keyPtr)
  * -- Returns TRUE if successful, else FALSE
  * =============================================================================
  */
+TM_CALLABLE
 bool_t
 TMhashtable_remove (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr)
 {
@@ -800,11 +935,16 @@ TMhashtable_remove (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr)
     list_t* chainPtr = hashtablePtr->buckets[i];
     pair_t* pairPtr;
     pair_t removePair;
+    bool_t rv;
 
+#ifndef ORIGINAL
+    TM_LOG_BEGIN(HSTB_REMOVE, NULL, hashtablePtr, keyPtr);
+#endif /* ORIGINAL */
     removePair.firstPtr = keyPtr;
     pairPtr = (pair_t*)TMLIST_FIND(chainPtr, &removePair);
     if (pairPtr == NULL) {
-        return FALSE;
+        rv = FALSE;
+        goto out;
     }
 
     bool_t status = TMLIST_REMOVE(chainPtr, &removePair);
@@ -812,12 +952,16 @@ TMhashtable_remove (TM_ARGDECL  hashtable_t* hashtablePtr, void* keyPtr)
     TMPAIR_FREE(pairPtr);
 
 #ifdef HASHTABLE_SIZE_FIELD
-    TM_SHARED_WRITE(hashtablePtr->size
-                    (long)TM_SHARED_READ(hashtablePtr->size)-1);
+    TM_SHARED_WRITE(hashtablePtr->size, (long)TM_SHARED_READ(hashtablePtr->size) - 1);
     assert(hashtablePtr->size >= 0);
 #endif
 
-    return TRUE;
+    rv = TRUE;
+out:
+#ifndef ORIGINAL
+    TM_LOG_END(HSTB_REMOVE, &rv);
+#endif /* ORIGINAL */
+    return rv;
 }
 
 
@@ -930,3 +1074,165 @@ main ()
  *
  * =============================================================================
  */
+
+#ifndef ORIGINAL
+# ifdef MERGE_HASHTABLE
+stm_merge_t TMhashtable_merge(stm_merge_context_t *params) {
+# ifdef MERGE_LIST
+    extern const stm_op_id_t LIST_FIND, LIST_INSERT;
+# endif /* MERGE_LIST */
+    const stm_op_id_t prev_op = params->leaf ? STM_INVALID_OPID : stm_get_op_opcode(params->previous);
+
+    /* Delayed merge only */
+    ASSERT(!STM_SAME_OP(stm_get_current_op(), params->current));
+
+    const stm_union_t *args;
+    const ssize_t nargs = stm_get_op_args(params->current, &args);
+
+    const hashtable_t *hashtablePtr = (nargs == 3) ? args[0].ptr : NULL;
+    ASSERT(params->rv.sint == TRUE || params->rv.sint == FALSE);
+
+    if (STM_SAME_OPID(stm_get_op_opcode(params->current), HSTB_INSERT)) {
+        /* Get the return value */
+        bool_t old_rv = ((stm_get_features() & STM_FEATURE_OPLOG_FULL) == STM_FEATURE_OPLOG_FULL) ? params->rv.sint : TRUE, rv = old_rv;
+
+        /* Conflict occurred directly inside HSTB_INSERT */
+        if (params->leaf == 1) {
+# ifdef TM_DEBUG
+            printf("\nHSTB_INSERT addr:%p hashtablePtr:%p keyPtr:%p dataPtr:%p\n", params->addr, args[0].ptr, args[1].ptr, args[2].ptr);
+# endif
+            ASSERT(!STM_VALID_OP(params->previous));
+            ASSERT(params->conflict.entries->type == STM_RD_VALIDATE);
+            ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+
+# ifdef HASHTABLE_SIZE_FIELD
+            ASSERT(params->leaf == 1);
+            ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+            const stm_read_t r = ENTRY_GET_READ(params->conflict.entries->e1);
+            ASSERT(STM_SAME_READ(r, TM_SHARED_DID_READ(hashtablePtr->size)));
+            hashtablePtr = (const hashtable_t *)TM_SHARED_GET_TAG(r);
+
+            long old, new;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, hashtablePtr->size, old));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, hashtablePtr->size, new));
+            if (old == new)
+                return STM_MERGE_OK;
+#  ifdef TM_DEBUG
+            printf("HSTB_INSERT hashtablePtr->size read (old):%ld (new):%ld, write (new):%ld\n", old, new, new + 1);
+#  endif
+            const stm_write_t w = TM_SHARED_DID_WRITE(hashtablePtr->size);
+            ASSERT(STM_VALID_WRITE(w));
+            ASSERT(STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+            ASSERT_FAIL(TM_SHARED_WRITE_UPDATE(w, hashtablePtr->size, new + 1));
+            params->conflict.previous_result.sint = TRUE;
+            return STM_MERGE_OK;
+# endif
+# ifdef MERGE_LIST
+        /* Update from LIST_FIND or LIST_INSERT */
+        } else if (STM_SAME_OPID(prev_op, LIST_FIND) || STM_SAME_OPID(prev_op, LIST_INSERT)) {
+            ASSERT(!params->leaf);
+
+#  ifdef TM_DEBUG
+            if (STM_SAME_OPID(prev_op, LIST_FIND))
+                printf("\nHSTB_INSERT <- LIST_FIND %p\n", params->conflict.result.ptr);
+            else
+                printf("\nHSTB_INSERT <- LIST_INSERT %ld\n", params->conflict.result.sint);
+#  endif
+
+            if (STM_SAME_OPID(prev_op, LIST_FIND))
+                rv = params->conflict.result.ptr ? FALSE : TRUE;
+            else
+                rv = params->conflict.result.sint == FALSE ? FALSE : TRUE;
+# endif /* MERGE_LIST */
+        }
+
+        if (rv != old_rv) {
+            ASSERT(params->leaf == 0);
+            const stm_union_t *prev_args;
+            const ssize_t prev_nargs = stm_get_op_args(params->previous, &prev_args);
+            ASSERT(prev_nargs == 2);
+            const pair_t *insertPtr = prev_args[1].ptr;
+            ASSERT(insertPtr);
+            ASSERT(insertPtr->firstPtr == args[1].ptr);
+            ASSERT(insertPtr->secondPtr == args[2].ptr);
+            /* Return value was TRUE and is now FALSE, undo the list insertion and free the pair */
+            if (rv == FALSE) {
+                ASSERT(old_rv == TRUE);
+                ASSERT(insertPtr);
+                stm_malloc_t m = TM_DID_MALLOC(insertPtr);
+                ASSERT(STM_VALID_MALLOC(m));
+                ASSERT_FAIL(TM_UNDO_MALLOC(m));
+
+# ifdef MERGE_LIST
+                if (STM_SAME_OPID(prev_op, LIST_FIND))
+                    ASSERT_FAIL(stm_undo_op_descendants(params->current, LIST_INSERT));
+# else
+                return STM_MERGE_ABORT;
+# endif /* MERGE_LIST */
+
+# ifdef HASHTABLE_SIZE_FIELD
+                /* Undo modification to the hashtable size */
+                stm_read_t r = TM_SHARED_DID_READ(hashtablePtr->size);
+                ASSERT(STM_VALID_READ(r));
+                ASSERT_FAIL(TM_SHARED_UNDO_READ(r));
+                stm_write_t w = TM_SHARED_DID_WRITE(hashtablePtr->size);
+                ASSERT(STM_VALID_WRITE(w));
+                ASSERT_FAIL(TM_SHARED_UNDO_WRITE(w));
+# endif
+            /* Return value was FALSE and is now TRUE, insert the new node and increase the hashtable size */
+            } else {
+                ASSERT(old_rv == FALSE);
+                stm_free_t f = TM_DID_FREE(insertPtr);
+                ASSERT(STM_VALID_FREE(f));
+                ASSERT_FAIL(TM_UNDO_FREE(f));
+
+# ifdef MERGE_LIST
+                if (STM_SAME_OPID(prev_op, LIST_FIND) && __builtin_expect(TMLIST_INSERT(hashtablePtr->buckets[hashtablePtr->hash(insertPtr->firstPtr) % hashtablePtr->numBucket], (void *)insertPtr) == FALSE, 0))
+                    return STM_MERGE_ABORT;
+# else
+                return STM_MERGE_ABORT;
+# endif /* MERGE_LIST */
+
+# ifdef HASHTABLE_SIZE_FIELD
+                ASSERT(!STM_VALID_READ(TM_SHARED_DID_READ(hashtablePtr->size)));
+                const long newSize = TM_SHARED_READ(hashtablePtr->size) + 1;
+                ASSERT(newSize > 0);
+                ASSERT(!STM_VALID_WRITE(TM_SHARED_DID_WRITE(hashtablePtr->size)));
+                TM_SHARED_WRITE(hashtablePtr->size, newSize);
+# endif
+            }
+        } else if ((uintptr_t)params->addr >= (uintptr_t)hashtablePtr && (uintptr_t)params->addr < (uintptr_t)hashtablePtr + sizeof(*hashtablePtr)) {
+            assert(0);
+            return STM_MERGE_ABORT;
+        }
+
+# ifdef TM_DEBUG
+        printf("HSTB_INSERT rv(old):%ld rv(new):%ld\n", params->rv.sint, rv);
+# endif
+        params->conflict.previous_result.sint = old_rv;
+        params->rv.sint = rv;
+        return STM_MERGE_OK;
+    }
+
+
+# ifdef TM_DEBUG
+    printf("\nTMHASHTABLE_MERGE UNSUPPORTED addr:%p\n", params->addr);
+# endif
+    return STM_MERGE_UNSUPPORTED;
+}
+# define TMHASHTABLE_MERGE TMhashtable_merge
+#else
+# define TMHASHTABLE_MERGE NULL
+#endif /* MERGE_HASHTABLE */
+
+__attribute__((constructor)) void hashtable_init() {
+    TM_LOG_FFI_DECLARE;
+    TM_LOG_TYPE_DECLARE_INIT(*lppll[], {&ffi_type_slong, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_slong, &ffi_type_slong});
+    TM_LOG_TYPE_DECLARE_INIT(*ppp[], {&ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer});
+    TM_LOG_TYPE_DECLARE_INIT(*pp[], {&ffi_type_pointer, &ffi_type_pointer});
+    TM_LOG_TYPE_DECLARE_INIT(*p[], {&ffi_type_pointer});
+    # define TM_LOG_OP TM_LOG_OP_INIT
+    # include "hashtable.inc"
+    # undef TM_LOG_OP
+}
+#endif /* ORIGINAL */

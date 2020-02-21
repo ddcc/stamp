@@ -1,0 +1,1 @@
+TM_LOG_OP(EXPAND, NULL, &ffi_type_void, pllllp, TMrouter_merge, STM_MERGE_POLICY_FUNCTION, STM_MERGE_POLICY_FUNCTION);

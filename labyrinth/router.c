@@ -105,6 +105,20 @@ point_t MOVE_NEGY = { 0, -1,  0,  0, MOMENTUM_NEGY};
 point_t MOVE_NEGZ = { 0,  0, -1,  0, MOMENTUM_NEGZ};
 
 
+#if !defined(ORIGINAL) && defined(MERGE_ROUTER)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "router.inc"
+# undef TM_LOG_OP
+
+stm_merge_t TMrouter_merge(stm_merge_context_t *params);
+#endif /* !ORIGINAL && MERGE_ROUTER */
+
+TM_INIT_GLOBAL;
+
+
+HTM_STATS_EXTERN(global_tsx_status);
+
+
 /* =============================================================================
  * router_alloc
  * =============================================================================
@@ -138,16 +152,60 @@ router_free (router_t* routerPtr)
 
 
 /* =============================================================================
- * PexpandToNeighbor
+ * HTMPexpandToNeighbor
  * =============================================================================
  */
 static void
-PexpandToNeighbor (grid_t* myGridPtr,
+HTMPexpandToNeighbor (TM_ARG  grid_t* myGridPtr,
                    long x, long y, long z, long value, queue_t* queuePtr)
 {
     if (grid_isPointValid(myGridPtr, x, y, z)) {
-        long* neighborGridPointPtr = grid_getPointRef(myGridPtr, x, y, z);
+        long *neighborGridPointPtr = grid_getPointRef(myGridPtr, x, y, z);
+#ifdef GRID_COPY
         long neighborValue = *neighborGridPointPtr;
+#else
+        long *globalNeighborGridPointPtr = grid_getPointRef(gridPtr, x, y, z);
+        long neighborValue = HTM_SHARED_READ(*globalNeighborGridPointPtr);
+#endif /* GRID_COPY */
+        if (neighborValue == GRID_POINT_EMPTY) {
+            (*neighborGridPointPtr) = value;
+            PQUEUE_PUSH(queuePtr, (void*)neighborGridPointPtr);
+        } else if (neighborValue != GRID_POINT_FULL) {
+            /* We have expanded here before... is this new path better? */
+            if (value < neighborValue) {
+
+                (*neighborGridPointPtr) = value;
+                PQUEUE_PUSH(queuePtr, (void*)neighborGridPointPtr);
+            }
+        }
+    }
+}
+
+
+/* =============================================================================
+ * TMPexpandToNeighbor
+ * =============================================================================
+ */
+TM_CALLABLE
+static void
+TMPexpandToNeighbor (TM_ARG  grid_t* myGridPtr,
+#ifndef GRID_COPY
+                   grid_t *gridPtr,
+#endif /* !GRID_COPY */
+                   long x, long y, long z, long value, queue_t* queuePtr)
+{
+#if !defined(ORIGINAL) && defined(MERGE_ROUTER) && !defined(GRID_COPY)
+    TM_LOG_BEGIN(EXPAND, NULL, myGridPtr, x, y, z, value, queuePtr);
+#endif /* !ORIGINAL && MERGE_ROUTER && !GRID_COPY */
+
+    if (grid_isPointValid(myGridPtr, x, y, z)) {
+        long *neighborGridPointPtr = grid_getPointRef(myGridPtr, x, y, z);
+#ifdef GRID_COPY
+        long neighborValue = *neighborGridPointPtr;
+#else
+        long *globalNeighborGridPointPtr = grid_getPointRef(gridPtr, x, y, z);
+        long neighborValue = TM_SHARED_READ(*globalNeighborGridPointPtr);
+#endif /* GRID_COPY */
         if (neighborValue == GRID_POINT_EMPTY) {
             (*neighborGridPointPtr) = value;
             PQUEUE_PUSH(queuePtr, (void*)neighborGridPointPtr);
@@ -159,16 +217,24 @@ PexpandToNeighbor (grid_t* myGridPtr,
             }
         }
     }
+
+#if !defined(ORIGINAL) && defined(MERGE_ROUTER) && !defined(GRID_COPY)
+    TM_LOG_END(EXPAND, NULL);
+#endif /* !ORIGINAL && MERGE_ROUTER && !GRID_COPY */
 }
 
 
 /* =============================================================================
- * PdoExpansion
+ * TMPdoExpansion
  * =============================================================================
  */
+TM_CALLABLE
 static bool_t
-PdoExpansion (router_t* routerPtr, grid_t* myGridPtr, queue_t* queuePtr,
-              coordinate_t* srcPtr, coordinate_t* dstPtr)
+TMPdoExpansion (router_t* routerPtr, grid_t* myGridPtr,
+#ifndef GRID_COPY
+              grid_t* gridPtr,
+#endif /* !GRID_COPY */
+              queue_t* queuePtr, coordinate_t* srcPtr, coordinate_t* dstPtr)
 {
     long xCost = routerPtr->xCost;
     long yCost = routerPtr->yCost;
@@ -208,12 +274,111 @@ PdoExpansion (router_t* routerPtr, grid_t* myGridPtr, queue_t* queuePtr,
          *
          * Potential Optimization: Only need to check 5 of these
          */
-        PexpandToNeighbor(myGridPtr, x+1, y,   z,   (value + xCost), queuePtr);
-        PexpandToNeighbor(myGridPtr, x-1, y,   z,   (value + xCost), queuePtr);
-        PexpandToNeighbor(myGridPtr, x,   y+1, z,   (value + yCost), queuePtr);
-        PexpandToNeighbor(myGridPtr, x,   y-1, z,   (value + yCost), queuePtr);
-        PexpandToNeighbor(myGridPtr, x,   y,   z+1, (value + zCost), queuePtr);
-        PexpandToNeighbor(myGridPtr, x,   y,   z-1, (value + zCost), queuePtr);
+        TMPexpandToNeighbor(myGridPtr,
+#ifndef GRID_COPY
+                          gridPtr,
+#endif /* !USE_PRIVITIZATION */
+                          x+1, y,   z,   (value + xCost), queuePtr);
+        TMPexpandToNeighbor(myGridPtr,
+#ifndef GRID_COPY
+                          gridPtr,
+#endif /* !USE_PRIVITIZATION */
+                          x-1, y,   z,   (value + xCost), queuePtr);
+        TMPexpandToNeighbor(myGridPtr,
+#ifndef GRID_COPY
+                          gridPtr,
+#endif /* !USE_PRIVITIZATION */
+                          x,   y+1, z,   (value + yCost), queuePtr);
+        TMPexpandToNeighbor(myGridPtr,
+#ifndef GRID_COPY
+                          gridPtr,
+#endif /* !USE_PRIVITIZATION */
+                          x,   y-1, z,   (value + yCost), queuePtr);
+        TMPexpandToNeighbor(myGridPtr,
+#ifndef GRID_COPY
+                          gridPtr,
+#endif /* !USE_PRIVITIZATION */
+                          x,   y,   z+1, (value + zCost), queuePtr);
+        TMPexpandToNeighbor(myGridPtr,
+#ifndef GRID_COPY
+                          gridPtr,
+#endif /* !USE_PRIVITIZATION */
+                          x,   y,   z-1, (value + zCost), queuePtr);
+
+    } /* iterate over work queue */
+
+#if DEBUG
+    printf("Expansion (%li, %li, %li) -> (%li, %li, %li):\n",
+           srcPtr->x, srcPtr->y, srcPtr->z,
+           dstPtr->x, dstPtr->y, dstPtr->z);
+    grid_print(myGridPtr);
+#endif /*  DEBUG */
+
+    return isPathFound;
+}
+
+
+/* =============================================================================
+ * HTMPdoExpansion
+ * =============================================================================
+ */
+static bool_t
+HTMPdoExpansion (TM_ARG   router_t* routerPtr, grid_t* myGridPtr,
+#ifndef GRID_COPY
+              grid_t* gridPtr,
+#endif /* !GRID_COPY */
+              queue_t* queuePtr, coordinate_t* srcPtr, coordinate_t* dstPtr)
+{
+    long xCost = routerPtr->xCost;
+    long yCost = routerPtr->yCost;
+    long zCost = routerPtr->zCost;
+
+    /*
+     * Potential Optimization: Make 'src' the one closest to edge.
+     * This will likely decrease the area of the emitted wave.
+     */
+
+    PQUEUE_CLEAR(queuePtr);
+    long* srcGridPointPtr =
+        grid_getPointRef(myGridPtr, srcPtr->x, srcPtr->y, srcPtr->z);
+    PQUEUE_PUSH(queuePtr, (void*)srcGridPointPtr);
+    grid_setPoint(myGridPtr, srcPtr->x, srcPtr->y, srcPtr->z, 0);
+    grid_setPoint(myGridPtr, dstPtr->x, dstPtr->y, dstPtr->z, GRID_POINT_EMPTY);
+    long* dstGridPointPtr =
+        grid_getPointRef(myGridPtr, dstPtr->x, dstPtr->y, dstPtr->z);
+    bool_t isPathFound = FALSE;
+
+    while (!PQUEUE_ISEMPTY(queuePtr)) {
+
+        long* gridPointPtr = (long*)PQUEUE_POP(queuePtr);
+        if (gridPointPtr == dstGridPointPtr) {
+            isPathFound = TRUE;
+            break;
+        }
+
+        long x;
+        long y;
+        long z;
+        grid_getPointIndices(myGridPtr, gridPointPtr, &x, &y, &z);
+        long value = (*gridPointPtr);
+
+        /*
+         * Check 6 neighbors
+         *
+         * Potential Optimization: Only need to check 5 of these
+         */
+        HTMPexpandToNeighbor(myGridPtr,
+                          x+1, y,   z,   (value + xCost), queuePtr);
+        HTMPexpandToNeighbor(myGridPtr,
+                          x-1, y,   z,   (value + xCost), queuePtr);
+        HTMPexpandToNeighbor(myGridPtr,
+                          x,   y+1, z,   (value + yCost), queuePtr);
+        HTMPexpandToNeighbor(myGridPtr,
+                          x,   y-1, z,   (value + yCost), queuePtr);
+        HTMPexpandToNeighbor(myGridPtr,
+                          x,   y,   z+1, (value + zCost), queuePtr);
+        HTMPexpandToNeighbor(myGridPtr,
+                          x,   y,   z-1, (value + zCost), queuePtr);
 
     } /* iterate over work queue */
 
@@ -232,6 +397,7 @@ PdoExpansion (router_t* routerPtr, grid_t* myGridPtr, queue_t* queuePtr,
  * traceToNeighbor
  * =============================================================================
  */
+TM_PURE
 static void
 traceToNeighbor (grid_t* myGridPtr,
                  point_t* currPtr,
@@ -265,11 +431,94 @@ traceToNeighbor (grid_t* myGridPtr,
 
 
 /* =============================================================================
- * PdoTraceback
+ * HTMPdoTraceback
  * =============================================================================
  */
 static vector_t*
-PdoTraceback (grid_t* gridPtr, grid_t* myGridPtr,
+HTMPdoTraceback (TM_ARG  grid_t* gridPtr, grid_t* myGridPtr,
+              coordinate_t* dstPtr, long bendCost)
+{
+    vector_t* pointVectorPtr = HTMVECTOR_ALLOC(1);
+    assert(pointVectorPtr);
+
+    point_t next;
+    next.x = dstPtr->x;
+    next.y = dstPtr->y;
+    next.z = dstPtr->z;
+    next.value = grid_getPoint(myGridPtr, next.x, next.y, next.z);
+    next.momentum = MOMENTUM_ZERO;
+
+    while (1) {
+
+        long* gridPointPtr = grid_getPointRef(gridPtr, next.x, next.y, next.z);
+        HTMVECTOR_PUSHBACK(pointVectorPtr, (void*)gridPointPtr);
+        grid_setPoint(myGridPtr, next.x, next.y, next.z, GRID_POINT_FULL);
+
+        /* Check if we are done */
+        if (next.value == 0) {
+            break;
+        }
+        point_t curr = next;
+
+        /*
+         * Check 6 neighbors
+         *
+         * Potential Optimization: Only need to check 5 of these
+         */
+        traceToNeighbor(myGridPtr, &curr, &MOVE_POSX, TRUE, bendCost, &next);
+        traceToNeighbor(myGridPtr, &curr, &MOVE_POSY, TRUE, bendCost, &next);
+        traceToNeighbor(myGridPtr, &curr, &MOVE_POSZ, TRUE, bendCost, &next);
+        traceToNeighbor(myGridPtr, &curr, &MOVE_NEGX, TRUE, bendCost, &next);
+        traceToNeighbor(myGridPtr, &curr, &MOVE_NEGY, TRUE, bendCost, &next);
+        traceToNeighbor(myGridPtr, &curr, &MOVE_NEGZ, TRUE, bendCost, &next);
+
+#if DEBUG
+        printf("(%li, %li, %li)\n", next.x, next.y, next.z);
+#endif /* DEBUG */
+        /*
+         * Because of bend costs, none of the neighbors may appear to be closer.
+         * In this case, pick a neighbor while ignoring momentum.
+         */
+        if ((curr.x == next.x) &&
+            (curr.y == next.y) &&
+            (curr.z == next.z))
+        {
+            next.value = curr.value;
+            traceToNeighbor(myGridPtr, &curr, &MOVE_POSX, FALSE, bendCost, &next);
+            traceToNeighbor(myGridPtr, &curr, &MOVE_POSY, FALSE, bendCost, &next);
+            traceToNeighbor(myGridPtr, &curr, &MOVE_POSZ, FALSE, bendCost, &next);
+            traceToNeighbor(myGridPtr, &curr, &MOVE_NEGX, FALSE, bendCost, &next);
+            traceToNeighbor(myGridPtr, &curr, &MOVE_NEGY, FALSE, bendCost, &next);
+            traceToNeighbor(myGridPtr, &curr, &MOVE_NEGZ, FALSE, bendCost, &next);
+
+            if ((curr.x == next.x) &&
+                (curr.y == next.y) &&
+                (curr.z == next.z))
+            {
+                PVECTOR_FREE(pointVectorPtr);
+#if DEBUG
+                puts("[dead]");
+#endif
+                return NULL; /* cannot find path */
+            }
+        }
+    }
+
+#if DEBUG
+    puts("");
+#endif /* DEBUG */
+
+    return pointVectorPtr;
+}
+
+
+/* =============================================================================
+ * TMPdoTraceback
+ * =============================================================================
+ */
+TM_CALLABLE
+static vector_t*
+TMPdoTraceback (TM_ARG  grid_t* gridPtr, grid_t* myGridPtr,
               coordinate_t* dstPtr, long bendCost)
 {
     vector_t* pointVectorPtr = TMVECTOR_ALLOC(1);
@@ -376,13 +625,28 @@ router_solve (void* argPtr)
     while (1) {
 
         pair_t* coordinatePairPtr;
-        TM_BEGIN();
-        if (TMQUEUE_ISEMPTY(workQueuePtr)) {
-            coordinatePairPtr = NULL;
+        HTM_TX_INIT;
+tsx_begin_pop:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            if (HTMQUEUE_ISEMPTY(workQueuePtr)) {
+                coordinatePairPtr = NULL;
+            } else {
+                coordinatePairPtr = (pair_t*)HTMQUEUE_POP(workQueuePtr);
+            }
+            HTM_END(global_tsx_status);
         } else {
-            coordinatePairPtr = (pair_t*)TMQUEUE_POP(workQueuePtr);
-        }
-        TM_END();
+            HTM_RETRY(tsx_status, tsx_begin_pop);
+
+            TM_BEGIN();
+            if (TMQUEUE_ISEMPTY(workQueuePtr)) {
+                coordinatePairPtr = NULL;
+            } else {
+                coordinatePairPtr = (pair_t*)TMQUEUE_POP(workQueuePtr);
+            }
+            TM_END();
+            }
+
         if (coordinatePairPtr == NULL) {
             break;
         }
@@ -393,18 +657,46 @@ router_solve (void* argPtr)
         bool_t success;
         vector_t* pointVectorPtr = NULL;
 
-        TM_BEGIN();
-        success = FALSE;
+#if defined(HTM) && defined(GRID_COPY)
         grid_copy(myGridPtr, gridPtr); /* ok if not most up-to-date */
-        if (PdoExpansion(routerPtr, myGridPtr, myExpansionQueuePtr,
-                         srcPtr, dstPtr)) {
-            pointVectorPtr = PdoTraceback(gridPtr, myGridPtr, dstPtr, bendCost);
-            if (pointVectorPtr) {
-                TMGRID_ADDPATH(gridPtr, pointVectorPtr);
-                TM_LOCAL_WRITE(success, TRUE);
+#endif /* HTM && GRID_COPY */
+tsx_begin_expansion:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            success = FALSE;
+            if (HTMPdoExpansion(routerPtr, myGridPtr,
+#ifndef GRID_COPY
+                                gridPtr,
+#endif /* !GRID_COPY */
+                                myExpansionQueuePtr, srcPtr, dstPtr)) {
+                pointVectorPtr = HTMPdoTraceback(gridPtr, myGridPtr, dstPtr, bendCost);
+                if (pointVectorPtr) {
+                    HTMGRID_ADDPATH(gridPtr, pointVectorPtr);
+                    HTM_LOCAL_WRITE(success, TRUE);
+                }
             }
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_expansion);
+
+            TM_BEGIN();
+            success = FALSE;
+#ifdef GRID_COPY
+            grid_copy(myGridPtr, gridPtr); /* ok if not most up-to-date */
+#endif /* GRID_COPY */
+            if (TMPdoExpansion(routerPtr, myGridPtr,
+#ifndef GRID_COPY
+                               gridPtr,
+#endif /* !GRID_COPY */
+                               myExpansionQueuePtr, srcPtr, dstPtr)) {
+                pointVectorPtr = TMPdoTraceback(gridPtr, myGridPtr, dstPtr, bendCost);
+                if (pointVectorPtr) {
+                    TMGRID_ADDPATH(gridPtr, pointVectorPtr);
+                    TM_LOCAL_WRITE(success, TRUE);
+                }
+            }
+            TM_END();
         }
-        TM_END();
 
         if (success) {
             bool_t status = PVECTOR_PUSHBACK(myPathVectorPtr,
@@ -419,9 +711,19 @@ router_solve (void* argPtr)
      * Add my paths to global list
      */
     list_t* pathVectorListPtr = routerArgPtr->pathVectorListPtr;
-    TM_BEGIN();
-    TMLIST_INSERT(pathVectorListPtr, (void*)myPathVectorPtr);
-    TM_END();
+    HTM_TX_INIT;
+tsx_begin_insert:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+      HTM_LOCK_READ();
+      HTMLIST_INSERT(pathVectorListPtr, (void*)myPathVectorPtr);
+      HTM_END(global_tsx_status);
+    } else {
+      HTM_RETRY(tsx_status, tsx_begin_insert);
+
+      TM_BEGIN();
+      TMLIST_INSERT(pathVectorListPtr, (void*)myPathVectorPtr);
+      TM_END();
+    }
 
     PGRID_FREE(myGridPtr);
     PQUEUE_FREE(myExpansionQueuePtr);
@@ -441,3 +743,66 @@ router_solve (void* argPtr)
  *
  * =============================================================================
  */
+
+
+#if !defined(ORIGINAL) && defined(MERGE_ROUTER) && !defined(GRID_COPY)
+stm_merge_t TMrouter_merge(stm_merge_context_t *params) {
+    const stm_op_id_t op = stm_get_op_opcode(params->current);
+
+    const stm_union_t *args;
+    ssize_t nargs = stm_get_op_args(params->current, &args);
+    if (nargs == -1)
+      return STM_MERGE_UNSUPPORTED;
+
+    if (STM_SAME_OPID(op, EXPAND)) {
+        ASSERT(nargs == 7);
+        const grid_t* myGridPtr = args[0].ptr;
+        ASSERT(myGridPtr);
+        const grid_t* gridPtr = args[1].ptr;
+        ASSERT(gridPtr);
+        const long x = args[2].sint;
+        ASSERT(x);
+        const long y = args[3].sint;
+        ASSERT(y);
+        const long z = args[4].sint;
+        ASSERT(z);
+        const long value = args[5].sint;
+        ASSERT(value);
+        const queue_t *queuePtr = args[6].ptr;
+        ASSERT(queuePtr);
+        if (params->leaf == 1) {
+            ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+            const stm_read_t r = ENTRY_GET_READ(params->conflict.entries->e1);
+
+# ifdef TM_DEBUG
+            printf("\nEXPAND addr:%p myGridPtr:%p gridPtr:%p x:%ld y:%ld z:%ld value:%ld queuePtr:%p\n", params->addr, myGridPtr, gridPtr, x, y, z, value, queuePtr);
+            long old;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, *(long *)params->addr, old));
+# endif
+            long new;
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, *(long *)params->addr, new));
+# ifdef TM_DEBUG
+            printf("EXPAND gridPtr->neighborValue:%p (old):%ld (new):%ld\n", params->addr, old, new);
+# endif
+            long *myGridPt = myGridPtr->points + ((long *)params->addr - gridPtr->points);
+# ifdef TM_DEBUG
+            printf("EXPAND myGridPtr->neighborValue:%p %ld\n", myGridPt, *myGridPt);
+# endif
+            return *myGridPt != GRID_POINT_FULL ? STM_MERGE_OK : STM_MERGE_ABORT;
+        }
+    }
+
+# ifdef TM_DEBUG
+    printf("\nROUTER_MERGE UNSUPPORTED addr:%p\n", params->addr);
+# endif
+    return STM_MERGE_UNSUPPORTED;
+}
+
+__attribute__((constructor)) void router_init() {
+    TM_LOG_FFI_DECLARE;
+    TM_LOG_TYPE_DECLARE_INIT(*pllllp[], {&ffi_type_pointer, &ffi_type_slong, &ffi_type_slong, &ffi_type_slong, &ffi_type_slong, &ffi_type_pointer});
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "router.inc"
+    #undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_ROUTER && !defined(GRID_COPY) */

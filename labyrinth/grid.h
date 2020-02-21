@@ -11,48 +11,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -127,6 +127,7 @@ Pgrid_free (grid_t* gridPtr);
  * grid_copy
  * =============================================================================
  */
+TM_PURE
 void
 grid_copy (grid_t* dstGridPtr, grid_t* srcGridPtr);
 
@@ -135,6 +136,7 @@ grid_copy (grid_t* dstGridPtr, grid_t* srcGridPtr);
  * grid_isPointValid
  * =============================================================================
  */
+TM_PURE
 bool_t
 grid_isPointValid (grid_t* gridPtr, long x, long y, long z);
 
@@ -143,6 +145,7 @@ grid_isPointValid (grid_t* gridPtr, long x, long y, long z);
  * grid_getPointRef
  * =============================================================================
  */
+TM_PURE
 long*
 grid_getPointRef (grid_t* gridPtr, long x, long y, long z);
 
@@ -151,6 +154,7 @@ grid_getPointRef (grid_t* gridPtr, long x, long y, long z);
  * grid_getPointIndices
  * =============================================================================
  */
+TM_PURE
 void
 grid_getPointIndices (grid_t* gridPtr,
                       long* gridPointPtr, long* xPtr, long* yPtr, long* zPtr);
@@ -160,6 +164,7 @@ grid_getPointIndices (grid_t* gridPtr,
  * grid_getPoint
  * =============================================================================
  */
+TM_PURE
 long
 grid_getPoint (grid_t* gridPtr, long x, long y, long z);
 
@@ -184,6 +189,7 @@ grid_isPointFull (grid_t* gridPtr, long x, long y, long z);
  * grid_setPoint
  * =============================================================================
  */
+TM_PURE
 void
 grid_setPoint (grid_t* gridPtr, long x, long y, long z, long value);
 
@@ -197,10 +203,18 @@ grid_addPath (grid_t* gridPtr, vector_t* pointVectorPtr);
 
 
 /* =============================================================================
+ * HTMgrid_addPath
+ * =============================================================================
+ */
+void
+HTMgrid_addPath (grid_t* gridPtr, vector_t* pointVectorPtr);
+
+
+/* =============================================================================
  * TMgrid_addPath
  * =============================================================================
  */
-TM_CALLABLE
+TM_CANCELLABLE
 void
 TMgrid_addPath (TM_ARGDECL  grid_t* gridPtr, vector_t* pointVectorPtr);
 
@@ -215,6 +229,8 @@ grid_print (grid_t* gridPtr);
 
 #define PGRID_ALLOC(x, y, z)            Pgrid_alloc(x, y, z)
 #define PGRID_FREE(g)                   Pgrid_free(g)
+
+#define HTMGRID_ADDPATH(g, p)           HTMgrid_addPath(g, p)
 
 #define TMGRID_ADDPATH(g, p)            TMgrid_addPath(TM_ARG  g, p)
 

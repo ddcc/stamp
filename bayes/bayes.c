@@ -71,10 +71,7 @@
 
 #include <assert.h>
 #include <getopt.h>
-
-#ifndef SIMULATOR
 #include <math.h>
-#endif
 
 #include "data.h"
 #include "learner.h"
@@ -338,12 +335,12 @@ MAIN(argc, argv)
     assert(status);
 
     printf("Actual score = %f\n", actualScore);
-#ifndef SIMULATOR
     float learnScore = learner_score(learnerPtr);
     printf("Learn score  = %f\n", learnScore);
     status = status ? fabsf(learnScore - actualScore) < 2750 : status;
     assert(status);
-#endif
+
+    HTM_STATS_PRINT(global_tsx_status);
 
     /*
      * Clean up
@@ -351,12 +348,10 @@ MAIN(argc, argv)
 
     fflush(stdout);
     random_free(randomPtr);
-#ifndef SIMULATOR
     adtree_free(adtreePtr);
 #  if 0
     learner_free(learnerPtr);
 #  endif
-#endif
 
     TM_SHUTDOWN();
     P_MEMORY_SHUTDOWN();

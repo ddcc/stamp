@@ -91,6 +91,14 @@
 #  define MAP_INSERT(map, key, data)  hashtable_insert(map, (void*)(key), (void*)(data))
 #  define MAP_REMOVE(map, key)        hashtable_remove(map, (void*)(key))
 
+#  define HTMMAP_ALLOC(hash, cmp)     HTMHASHTABLE_ALLOC(1, hash, cmp, 2, 2)
+#  define HTMMAP_FREE(map, free)      HTMHASHTABLE_FREE(map)
+#  define HTMMAP_CONTAINS(map, key)   HTMHASHTABLE_CONTAINS(map, (void*)(key))
+#  define HTMMAP_FIND(map, key)       HTMHASHTABLE_FIND(map, (void*)(key))
+#  define HTMMAP_INSERT(map, key, data) \
+   HTMHASHTABLE_INSERT(map, (void*)(key), (void*)(data))
+#  define HTMMAP_REMOVE(map, key)     HTMHASHTABLE_REMOVE(map, (void*)(key))
+
 #  define TMMAP_ALLOC(hash, cmp)      TMHASHTABLE_ALLOC(1, hash, cmp, 2, 2)
 #  define TMMAP_FREE(map, free)       TMHASHTABLE_FREE(map)
 #  define TMMAP_CONTAINS(map, key)    TMHASHTABLE_CONTAINS(map, (void*)(key))
@@ -289,9 +297,16 @@
     rbtree_insert(map, (void*)(key), (void*)(data))
 #  define MAP_REMOVE(map, key)        rbtree_delete(map, (void*)(key))
 
+#  define HTMMAP_ALLOC(hash, cmp)     HTMRBTREE_ALLOC(cmp)
+#  define HTMMAP_FREE(map, free)      HTMRBTREE_FREE(map, free)
+#  define HTMMAP_CONTAINS(map, key)   HTMRBTREE_CONTAINS(map, (void*)(key))
+#  define HTMMAP_FIND(map, key)       HTMRBTREE_GET(map, (void*)(key))
+#  define HTMMAP_INSERT(map, key, data) \
+   HTMRBTREE_INSERT(map, (void*)(key), (void*)(data))
+#  define HTMMAP_REMOVE(map, key)     HTMRBTREE_DELETE(map, (void*)(key))
+
 #  define TMMAP_ALLOC(hash, cmp)      TMRBTREE_ALLOC(cmp)
 #  define TMMAP_FREE(map, free)       TMRBTREE_FREE(map, free)
-
 #  define TMMAP_CONTAINS(map, key)    TMRBTREE_CONTAINS(map, (void*)(key))
 #  define TMMAP_FIND(map, key)        TMRBTREE_GET(map, (void*)(key))
 #  define TMMAP_INSERT(map, key, data) \

@@ -6,48 +6,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -91,6 +91,7 @@ static long       global_iter;
 static ULONGINT_T global_cliqueSize = 0;
 static ULONGINT_T global_cutSetIndex = 0;
 
+HTM_STATS_EXTERN(global_tsx_status);
 
 /* =============================================================================
  * cutClusters
@@ -528,11 +529,21 @@ cutClusters (void* argPtr)
             iter++;
             global_iter = iter;
         }
+        HTM_TX_INIT;
+tsx_begin_clique:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            long tmp_cliqueSize = (long)HTM_SHARED_READ(global_cliqueSize);
+            HTM_SHARED_WRITE(global_cliqueSize, (tmp_cliqueSize + cliqueSize));
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_clique);
 
-        TM_BEGIN();
-        long tmp_cliqueSize = (long)TM_SHARED_READ(global_cliqueSize);
-        TM_SHARED_WRITE(global_cliqueSize, (tmp_cliqueSize + cliqueSize));
-        TM_END();
+            TM_BEGIN();
+            long tmp_cliqueSize = (long)TM_SHARED_READ(global_cliqueSize);
+            TM_SHARED_WRITE(global_cliqueSize, (tmp_cliqueSize + cliqueSize));
+            TM_END();
+        }
 
         thread_barrier_wait();
 
@@ -600,11 +611,21 @@ cutClusters (void* argPtr)
             edgeStartCounter[t] = edgeEndCounter[t-1];
         }
     }
+    HTM_TX_INIT;
+tsx_begin_cut:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        long tmp_cutSetIndex = (long)HTM_SHARED_READ(global_cutSetIndex);
+        HTM_SHARED_WRITE(global_cutSetIndex, (tmp_cutSetIndex + cutSetIndex));
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_cut);
 
-    TM_BEGIN();
-    long tmp_cutSetIndex = (long)TM_SHARED_READ(global_cutSetIndex);
-    TM_SHARED_WRITE(global_cutSetIndex, (tmp_cutSetIndex + cutSetIndex));
-    TM_END();
+        TM_BEGIN();
+        long tmp_cutSetIndex = (long)TM_SHARED_READ(global_cutSetIndex);
+        TM_SHARED_WRITE(global_cutSetIndex, (tmp_cutSetIndex + cutSetIndex));
+        TM_END();
+    }
 
     thread_barrier_wait();
 

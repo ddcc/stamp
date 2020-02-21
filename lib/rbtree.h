@@ -22,48 +22,48 @@
  *
  * For the license of bayes/sort.h and bayes/sort.c, please see the header
  * of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of kmeans, please see kmeans/LICENSE.kmeans
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of ssca2, please see ssca2/COPYRIGHT
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/mt19937ar.c and lib/mt19937ar.h, please see the
  * header of the files.
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * For the license of lib/rbtree.h and lib/rbtree.c, please see
  * lib/LEGALNOTICE.rbtree and lib/LICENSE.rbtree
- * 
+ *
  * ------------------------------------------------------------------------
- * 
+ *
  * Unless otherwise noted, the following license applies to STAMP files:
- * 
+ *
  * Copyright (c) 2007, Stanford University
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  *     * Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in
  *       the documentation and/or other materials provided with the
  *       distribution.
- * 
+ *
  *     * Neither the name of Stanford University nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY STANFORD UNIVERSITY ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -97,6 +97,14 @@ typedef struct rbtree rbtree_t;
 
 
 /* =============================================================================
+ * rbtree_compare
+ * =============================================================================
+ */
+long
+rbtree_compare (const void* a, const void* b);
+
+
+/* =============================================================================
  * rbtree_verify
  * =============================================================================
  */
@@ -113,9 +121,18 @@ rbtree_alloc (long (*compare)(const void*, const void*));
 
 
 /* =============================================================================
+ * HTMrbtree_alloc
+ * =============================================================================
+ */
+rbtree_t*
+HTMrbtree_alloc (long (*compare)(const void*, const void*));
+
+
+/* =============================================================================
  * TMrbtree_alloc
  * =============================================================================
  */
+TM_CALLABLE
 rbtree_t*
 TMrbtree_alloc (TM_ARGDECL  long (*compare)(const void*, const void*));
 
@@ -129,11 +146,20 @@ rbtree_free (rbtree_t* r,  void (*freeData)(void *, void *));
 
 
 /* =============================================================================
- * TMrbtree_free
+ * HTMrbtree_free
  * =============================================================================
  */
 void
-TMrbtree_free (TM_ARGDECL  rbtree_t* r, void (*TMfreeData)(void *, void *));
+HTMrbtree_free (rbtree_t* r, void (*HTMfreeData)(void *, void *));
+
+
+/* =============================================================================
+ * TMrbtree_free
+ * =============================================================================
+ */
+TM_CALLABLE
+void
+TMrbtree_free (TM_ARGDECL  rbtree_t* r, TM_CALLABLE void (*TMfreeData)(void *, void *));
 
 
 /* =============================================================================
@@ -143,6 +169,15 @@ TMrbtree_free (TM_ARGDECL  rbtree_t* r, void (*TMfreeData)(void *, void *));
  */
 bool_t
 rbtree_insert (rbtree_t* r, void* key, void* val);
+
+
+/* =============================================================================
+ * HTMrbtree_insert
+ * -- Returns TRUE on success
+ * =============================================================================
+ */
+bool_t
+HTMrbtree_insert (rbtree_t* r, void* key, void* val);
 
 
 /* =============================================================================
@@ -161,6 +196,14 @@ TMrbtree_insert (TM_ARGDECL  rbtree_t* r, void* key, void* val);
  */
 bool_t
 rbtree_delete (rbtree_t* r, void* key);
+
+
+/* =============================================================================
+ * HTMrbtree_delete
+ * =============================================================================
+ */
+bool_t
+HTMrbtree_delete (rbtree_t* r, void* key);
 
 
 /* =============================================================================
@@ -200,6 +243,14 @@ rbtree_get (rbtree_t* r, void* key);
 
 
 /* =============================================================================
+ * HTMrbtree_get
+ * =============================================================================
+ */
+void*
+HTMrbtree_get (rbtree_t* r, void* key);
+
+
+/* =============================================================================
  * TMrbtree_get
  * =============================================================================
  */
@@ -217,6 +268,14 @@ rbtree_contains (rbtree_t* r, void* key);
 
 
 /* =============================================================================
+ * HTMrbtree_contains
+ * =============================================================================
+ */
+bool_t
+HTMrbtree_contains (rbtree_t* r, void* key);
+
+
+/* =============================================================================
  * TMrbtree_contains
  * =============================================================================
  */
@@ -224,6 +283,38 @@ TM_CALLABLE
 bool_t
 TMrbtree_contains (TM_ARGDECL  rbtree_t* r, void* key);
 
+
+/* =============================================================================
+ * rbtree_setCompare
+ * =============================================================================
+ */
+void
+rbtree_setCompare (rbtree_t* r, long (*compare)(const void*, const void*));
+
+
+/* =============================================================================
+ * TMrbtree_setCompare
+ * =============================================================================
+ */
+TM_CALLABLE
+void
+TMrbtree_setCompare (TM_ARGDECL  rbtree_t* r, long (*compare)(const void*, const void*));
+
+
+/* =============================================================================
+ * rbtree_iterate
+ * =============================================================================
+ */
+void
+rbtree_iterate (rbtree_t* r, void (*cb)(void *, void *));
+
+#define HTMRBTREE_ALLOC(cmp)      HTMrbtree_alloc(cmp)
+#define HTMRBTREE_FREE(r, free)   HTMrbtree_free(r, free)
+#define HTMRBTREE_INSERT(r, k, v) HTMrbtree_insert(r, (void*)(k), (void*)(v))
+#define HTMRBTREE_DELETE(r, k)    HTMrbtree_delete(r, (void*)(k))
+#define HTMRBTREE_UPDATE(r, k, v) HTMrbtree_update(r, (void*)(k), (void*)(v))
+#define HTMRBTREE_GET(r, k)       HTMrbtree_get(r, (void*)(k))
+#define HTMRBTREE_CONTAINS(r, k)  HTMrbtree_contains(r, (void*)(k))
 
 #define TMRBTREE_ALLOC(cmp)       TMrbtree_alloc(TM_ARG  cmp)
 #define TMRBTREE_FREE(r, free)    TMrbtree_free(TM_ARG  r, free)

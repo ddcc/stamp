@@ -77,12 +77,18 @@
 #include "tm.h"
 #include "types.h"
 
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "reservation.inc"
+# undef TM_LOG_OP
+#endif /* !ORIGINAL && MERGE_RESERVATION */
+
 /* =============================================================================
  * DECLARATION OF TM_CALLABLE FUNCTIONS
  * =============================================================================
  */
 
-TM_CALLABLE
+TM_CANCELLABLE
 static void
 checkReservation (TM_ARGDECL  reservation_t* reservationPtr);
 
@@ -91,6 +97,7 @@ checkReservation (TM_ARGDECL  reservation_t* reservationPtr);
  * -- Returns NULL on failure
  * =============================================================================
  */
+TM_CALLABLE
 reservation_info_t*
 reservation_info_alloc (TM_ARGDECL  reservation_type_t type, long id, long price)
 {
@@ -106,22 +113,53 @@ reservation_info_alloc (TM_ARGDECL  reservation_type_t type, long id, long price
     return reservationInfoPtr;
 }
 
+reservation_info_t*
+HTMreservation_info_alloc (reservation_type_t type, long id, long price)
+{
+    reservation_info_t* reservationInfoPtr;
+
+    reservationInfoPtr = (reservation_info_t*)HTM_MALLOC(sizeof(reservation_info_t));
+    if (reservationInfoPtr != NULL) {
+        reservationInfoPtr->type = type;
+        reservationInfoPtr->id = id;
+        reservationInfoPtr->price = price;
+    }
+
+    return reservationInfoPtr;
+}
+
+reservation_info_t*
+reservation_info_alloc_seq (reservation_type_t type, long id, long price)
+{
+    reservation_info_t* reservationInfoPtr;
+
+    reservationInfoPtr = (reservation_info_t*)malloc(sizeof(reservation_info_t));
+    if (reservationInfoPtr != NULL) {
+        reservationInfoPtr->type = type;
+        reservationInfoPtr->id = id;
+        reservationInfoPtr->price = price;
+    }
+
+    return reservationInfoPtr;
+}
 
 /* =============================================================================
  * reservation_info_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 reservation_info_free (TM_ARGDECL  reservation_info_t* reservationInfoPtr)
 {
     TM_FREE(reservationInfoPtr);
 }
 
+void
+HTMreservation_info_free (reservation_info_t* reservationInfoPtr)
+{
+    HTM_FREE(reservationInfoPtr);
+}
 
-/* =============================================================================
- * reservation_info_free_seq
- * =============================================================================
- */
 void
 reservation_info_free_seq (reservation_info_t* reservationInfoPtr)
 {
@@ -135,7 +173,7 @@ reservation_info_free_seq (reservation_info_t* reservationInfoPtr)
  * =============================================================================
  */
 long
-reservation_info_compare (reservation_info_t* aPtr, reservation_info_t* bPtr)
+reservation_info_compare (const reservation_info_t* aPtr, const reservation_info_t* bPtr)
 {
     long typeDiff;
 
@@ -150,20 +188,25 @@ reservation_info_compare (reservation_info_t* aPtr, reservation_info_t* bPtr)
  * -- Check if consistent
  * =============================================================================
  */
+TM_CANCELLABLE
 static void
 checkReservation (TM_ARGDECL  reservation_t* reservationPtr)
 {
-    long numUsed = (long)TM_SHARED_READ(reservationPtr->numUsed);
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+    TM_LOG_BEGIN(RSV_CHECK, NULL, reservationPtr);
+#endif /* !ORIGINAL && MERGE_RESERVATION */
+
+    long numUsed = (long)TM_SHARED_READ_TAG(reservationPtr->numUsed, reservationPtr);
     if (numUsed < 0) {
         TM_RESTART();
     }
-    
-    long numFree = (long)TM_SHARED_READ(reservationPtr->numFree);
+
+    long numFree = (long)TM_SHARED_READ_TAG(reservationPtr->numFree, reservationPtr);
     if (numFree < 0) {
         TM_RESTART();
     }
 
-    long numTotal = (long)TM_SHARED_READ(reservationPtr->numTotal);
+    long numTotal = (long)TM_SHARED_READ_TAG(reservationPtr->numTotal, reservationPtr);
     if (numTotal < 0) {
         TM_RESTART();
     }
@@ -172,15 +215,49 @@ checkReservation (TM_ARGDECL  reservation_t* reservationPtr)
         TM_RESTART();
     }
 
-    long price = (long)TM_SHARED_READ(reservationPtr->price);
+    long price = (long)TM_SHARED_READ_TAG(reservationPtr->price, reservationPtr);
     if (price < 0) {
         TM_RESTART();
     }
+
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+    TM_LOG_END(RSV_CHECK, NULL);
+#endif /* !ORIGINAL && MERGE_RESERVATION */
 }
 
 #define CHECK_RESERVATION(reservation) \
     checkReservation(TM_ARG  reservation)
 
+static void
+HTMcheckReservation (reservation_t* reservationPtr)
+{
+    long numUsed = (long)HTM_SHARED_READ(reservationPtr->numUsed);
+    if (numUsed < 0) {
+        HTM_RESTART();
+    }
+
+    long numFree = (long)HTM_SHARED_READ(reservationPtr->numFree);
+    if (numFree < 0) {
+        HTM_RESTART();
+    }
+
+    long numTotal = (long)HTM_SHARED_READ(reservationPtr->numTotal);
+    if (numTotal < 0) {
+        HTM_RESTART();
+    }
+
+    if ((numUsed + numFree) != numTotal) {
+        HTM_RESTART();
+    }
+
+    long price = (long)HTM_SHARED_READ(reservationPtr->price);
+    if (price < 0) {
+        HTM_RESTART();
+    }
+}
+
+#define HTMCHECK_RESERVATION(reservation) \
+    HTMcheckReservation(reservation)
 
 static void
 checkReservation_seq (reservation_t* reservationPtr)
@@ -199,6 +276,7 @@ checkReservation_seq (reservation_t* reservationPtr)
  * -- Returns NULL on failure
  * =============================================================================
  */
+TM_CANCELLABLE
 reservation_t*
 reservation_alloc (TM_ARGDECL  long id, long numTotal, long price)
 {
@@ -212,6 +290,25 @@ reservation_alloc (TM_ARGDECL  long id, long numTotal, long price)
         reservationPtr->numTotal = numTotal;
         reservationPtr->price = price;
         CHECK_RESERVATION(reservationPtr);
+    }
+
+    return reservationPtr;
+}
+
+
+reservation_t*
+HTMreservation_alloc (long id, long numTotal, long price)
+{
+    reservation_t* reservationPtr;
+
+    reservationPtr = (reservation_t*)HTM_MALLOC(sizeof(reservation_t));
+    if (reservationPtr != NULL) {
+        reservationPtr->id = id;
+        reservationPtr->numUsed = 0;
+        reservationPtr->numFree = numTotal;
+        reservationPtr->numTotal = numTotal;
+        reservationPtr->price = price;
+        HTMCHECK_RESERVATION(reservationPtr);
     }
 
     return reservationPtr;
@@ -243,10 +340,11 @@ reservation_alloc_seq (long id, long numTotal, long price)
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
+TM_CANCELLABLE
 bool_t
 reservation_addToTotal (TM_ARGDECL  reservation_t* reservationPtr, long num)
 {
-    long numFree = (long)TM_SHARED_READ(reservationPtr->numFree);
+    long numFree = (long)TM_SHARED_READ_TAG(reservationPtr->numFree, reservationPtr);
 
     if (numFree + num < 0) {
         return FALSE;
@@ -254,9 +352,28 @@ reservation_addToTotal (TM_ARGDECL  reservation_t* reservationPtr, long num)
 
     TM_SHARED_WRITE(reservationPtr->numFree, (numFree + num));
     TM_SHARED_WRITE(reservationPtr->numTotal,
-                    ((long)TM_SHARED_READ(reservationPtr->numTotal) + num));
+                    ((long)TM_SHARED_READ_TAG(reservationPtr->numTotal, reservationPtr) + num));
 
     CHECK_RESERVATION(reservationPtr);
+
+    return TRUE;
+}
+
+
+bool_t
+HTMreservation_addToTotal (reservation_t* reservationPtr, long num)
+{
+    long numFree = (long)HTM_SHARED_READ(reservationPtr->numFree);
+
+    if (numFree + num < 0) {
+        return FALSE;
+    }
+
+    HTM_SHARED_WRITE(reservationPtr->numFree, (numFree + num));
+    HTM_SHARED_WRITE(reservationPtr->numTotal,
+                    ((long)HTM_SHARED_READ(reservationPtr->numTotal) + num));
+
+    HTMCHECK_RESERVATION(reservationPtr);
 
     return TRUE;
 }
@@ -283,21 +400,56 @@ reservation_addToTotal_seq (reservation_t* reservationPtr, long num)
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
+TM_CANCELLABLE
 bool_t
 reservation_make (TM_ARGDECL  reservation_t* reservationPtr)
 {
-    long numFree = (long)TM_SHARED_READ(reservationPtr->numFree);
+    bool_t rv;
+
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+    TM_LOG_BEGIN(RSV_MAKE, NULL, reservationPtr);
+#endif /* !ORIGINAL && MERGE_RESERVATION */
+    long numFree = (long)TM_SHARED_READ_TAG(reservationPtr->numFree, reservationPtr);
 
     if (numFree < 1) {
-        return FALSE;
+        rv = FALSE;
+        goto out;
     }
     TM_SHARED_WRITE(reservationPtr->numUsed,
-                    ((long)TM_SHARED_READ(reservationPtr->numUsed) + 1));
+                    ((long)TM_SHARED_READ_TAG(reservationPtr->numUsed, reservationPtr) + 1));
     TM_SHARED_WRITE(reservationPtr->numFree, (numFree - 1));
 
     CHECK_RESERVATION(reservationPtr);
 
-    return TRUE;
+    rv = TRUE;
+out:
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+    TM_LOG_END(RSV_MAKE, &rv);
+#endif /* !ORIGINAL && MERGE_RESERVATION */
+    return rv;
+}
+
+
+bool_t
+HTMreservation_make (reservation_t* reservationPtr)
+{
+    bool_t rv;
+
+    long numFree = (long)HTM_SHARED_READ(reservationPtr->numFree);
+
+    if (numFree < 1) {
+        rv = FALSE;
+        goto out;
+    }
+    HTM_SHARED_WRITE(reservationPtr->numUsed,
+                    ((long)HTM_SHARED_READ(reservationPtr->numUsed) + 1));
+    HTM_SHARED_WRITE(reservationPtr->numFree, (numFree - 1));
+
+    HTMCHECK_RESERVATION(reservationPtr);
+
+    rv = TRUE;
+out:
+    return rv;
 }
 
 
@@ -322,22 +474,58 @@ reservation_make_seq (reservation_t* reservationPtr)
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
+TM_CANCELLABLE
 bool_t
 reservation_cancel (TM_ARGDECL  reservation_t* reservationPtr)
 {
-    long numUsed = (long)TM_SHARED_READ(reservationPtr->numUsed);
+    bool_t rv;
+
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+    TM_LOG_BEGIN(RSV_CANCEL, NULL, reservationPtr);
+#endif /* !ORIGINAL && MERGE_RESERVATION */
+    long numUsed = (long)TM_SHARED_READ_TAG(reservationPtr->numUsed, reservationPtr);
 
     if (numUsed < 1) {
-        return FALSE;
+        rv = FALSE;
+        goto out;
     }
 
     TM_SHARED_WRITE(reservationPtr->numUsed, (numUsed - 1));
     TM_SHARED_WRITE(reservationPtr->numFree,
-                    ((long)TM_SHARED_READ(reservationPtr->numFree) + 1));
+                    ((long)TM_SHARED_READ_TAG(reservationPtr->numFree, reservationPtr) + 1));
 
     CHECK_RESERVATION(reservationPtr);
 
-    return TRUE;
+    rv = TRUE;
+out:
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+    TM_LOG_END(RSV_CANCEL, &rv);
+#endif /* !ORIGINAL && MERGE_RESERVATION */
+    return rv;
+}
+
+
+bool_t
+HTMreservation_cancel (reservation_t* reservationPtr)
+{
+    bool_t rv;
+
+    long numUsed = (long)TM_SHARED_READ(reservationPtr->numUsed);
+
+    if (numUsed < 1) {
+        rv = FALSE;
+        goto out;
+    }
+
+    HTM_SHARED_WRITE(reservationPtr->numUsed, (numUsed - 1));
+    HTM_SHARED_WRITE(reservationPtr->numFree,
+                    ((long)TM_SHARED_READ(reservationPtr->numFree) + 1));
+
+    HTMCHECK_RESERVATION(reservationPtr);
+
+    rv = TRUE;
+out:
+    return rv;
 }
 
 
@@ -363,6 +551,7 @@ reservation_cancel_seq (reservation_t* reservationPtr)
  * -- Returns TRUE on success, else FALSE
  * =============================================================================
  */
+TM_CANCELLABLE
 bool_t
 reservation_updatePrice (TM_ARGDECL  reservation_t* reservationPtr, long newPrice)
 {
@@ -373,6 +562,21 @@ reservation_updatePrice (TM_ARGDECL  reservation_t* reservationPtr, long newPric
     TM_SHARED_WRITE(reservationPtr->price, newPrice);
 
     CHECK_RESERVATION(reservationPtr);
+
+    return TRUE;
+}
+
+
+bool_t
+HTMreservation_updatePrice (reservation_t* reservationPtr, long newPrice)
+{
+    if (newPrice < 0) {
+        return FALSE;
+    }
+
+    HTM_SHARED_WRITE(reservationPtr->price, newPrice);
+
+    HTMCHECK_RESERVATION(reservationPtr);
 
     return TRUE;
 }
@@ -421,6 +625,7 @@ reservation_hash (reservation_t* reservationPtr)
  * reservation_free
  * =============================================================================
  */
+TM_CALLABLE
 void
 reservation_free (TM_ARGDECL  reservation_t* reservationPtr)
 {
@@ -428,10 +633,13 @@ reservation_free (TM_ARGDECL  reservation_t* reservationPtr)
 }
 
 
-/* =============================================================================
- * reservation_free_seq
- * =============================================================================
- */
+void
+HTMreservation_free (reservation_t* reservationPtr)
+{
+    HTM_FREE(reservationPtr);
+}
+
+
 void
 reservation_free_seq (reservation_t* reservationPtr)
 {
@@ -532,3 +740,133 @@ main ()
  *
  * =============================================================================
  */
+
+#if !defined(ORIGINAL) && defined(MERGE_RESERVATION)
+stm_merge_t TMreservation_merge(stm_merge_context_t *params) {
+    stm_op_id_t op = stm_get_op_opcode(params->current);
+
+    if (STM_SAME_OPID(op, RSV_MAKE) || STM_SAME_OPID(op, RSV_CANCEL) || STM_SAME_OPID(op, RSV_CHECK)) {
+        ASSERT(params->leaf == 1);
+        ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+        stm_read_t r = ENTRY_GET_READ(params->conflict.entries->e1);
+        stm_write_t w;
+
+        const reservation_t *reservationPtr = (const reservation_t *)TM_SHARED_GET_TAG(r);
+        ASSERT(reservationPtr);
+# ifdef TM_DEBUG
+        printf("\n%s addr:%p reservationPtr:%p\n", STM_SAME_OPID(op, RSV_MAKE) ? "RSV_MAKE" : "RSV_CANCEL", params->addr, reservationPtr);
+# endif
+
+        ASSERT(STM_VALID_READ(r));
+        ASSERT(!((stm_get_features() & STM_FEATURE_OPLOG_FULL) == STM_FEATURE_OPLOG_FULL) || STM_SAME_OPID(op, RSV_CHECK) || params->rv.sint == TRUE);
+        /* Check the reservationPtr->price */
+        if (params->addr == &reservationPtr->price) {
+            long oldPrice, newPrice;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, reservationPtr->price, oldPrice));
+            ASSERT(oldPrice >= 0);
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, reservationPtr->price, newPrice));
+            ASSERT(newPrice >= 0);
+            if (oldPrice == newPrice)
+                return STM_MERGE_OK;
+# ifdef TM_DEBUG
+            printf("%s reservationPtr->price (old):%ld (new):%ld\n", STM_SAME_OPID(op, RSV_MAKE) ? "RSV_MAKE" : "RSV_CANCEL", oldPrice, newPrice);
+# endif
+            return STM_MERGE_OK;
+        /* Update the read on reservationPtr->total */
+        } else if (params->addr == &reservationPtr->numTotal) {
+            long oldTotal, newTotal;
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, reservationPtr->numTotal, oldTotal));
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, reservationPtr->numTotal, newTotal));
+
+# ifdef TM_DEBUG
+            printf("%s reservationPtr->numTotal (old):%ld (new):%ld\n", STM_SAME_OPID(op, RSV_MAKE) ? "RSV_MAKE" : "RSV_CANCEL", oldTotal, newTotal);
+# endif
+            return STM_MERGE_OK;
+
+        } else if (params->addr == &reservationPtr->numFree) {
+            long oldFree, newFree;
+
+            /* Update the read on reservationPtr->numFree */
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, reservationPtr->numFree, oldFree));
+            if (STM_SAME_OPID(op, RSV_CHECK))
+                ASSERT(oldFree >= 0);
+            else
+                ASSERT(STM_SAME_OPID(op, RSV_MAKE) ? oldFree > 0 : oldFree >= 0);
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, reservationPtr->numFree, newFree));
+            if (STM_SAME_OPID(op, RSV_MAKE) && __builtin_expect(newFree < 1, 0))
+                return STM_MERGE_ABORT;
+            ASSERT(newFree >= 0);
+            if (oldFree == newFree)
+                return STM_MERGE_OK;
+
+            /* Update the write on reservationPtr->numFree */
+            if (!STM_SAME_OPID(op, RSV_CHECK)) {
+                /* Get the write on reservationPtr->numFree */
+                w = TM_SHARED_DID_WRITE(reservationPtr->numFree);
+                ASSERT_FAIL(STM_VALID_WRITE(w));
+                ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+
+                const long newFreeW = STM_SAME_OPID(op, RSV_MAKE) ? newFree - 1 : newFree + 1;
+                ASSERT_FAIL(TM_SHARED_WRITE_UPDATE(w, reservationPtr->numFree, newFreeW));
+# ifdef TM_DEBUG
+                printf("%s reservationPtr->numFree:%p (old):%ld (new):%ld, write (new):%ld\n", STM_SAME_OPID(op, RSV_MAKE) ? "RSV_MAKE" : "RSV_CANCEL", &reservationPtr->numFree, oldFree, newFree, newFreeW);
+# endif
+            } else {
+# ifdef TM_DEBUG
+                printf("%s reservationPtr->numFree:%p (old):%ld (new):%ld\n", STM_SAME_OPID(op, RSV_MAKE) ? "RSV_MAKE" : "RSV_CANCEL", &reservationPtr->numFree, oldFree, newFree);
+# endif
+            }
+
+            return STM_MERGE_OK;
+        } else if (params->addr == &reservationPtr->numUsed) {
+            long oldUsed, newUsed;
+
+            /* Update the read on reservationPtr->numUsed */
+            ASSERT_FAIL(TM_SHARED_READ_VALUE(r, reservationPtr->numUsed, oldUsed));
+            if (STM_SAME_OPID(op, RSV_CHECK))
+                ASSERT(oldUsed >= 0);
+            else
+                ASSERT(STM_SAME_OPID(op, RSV_MAKE) ? oldUsed >= 0 : oldUsed > 0);
+            ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, reservationPtr->numUsed, newUsed));
+            if (STM_SAME_OPID(op, RSV_CANCEL) && __builtin_expect(newUsed < 1, 0))
+                    return STM_MERGE_ABORT;
+            ASSERT(newUsed >= 0);
+            if (oldUsed == newUsed)
+                return STM_MERGE_OK;
+
+            /* Update the write on reservationPtr->numUsed */
+            if (!STM_SAME_OPID(op, RSV_CHECK)) {
+                 /* Get the write on reservationPtr->numUsed */
+                w = TM_SHARED_DID_WRITE(reservationPtr->numUsed);
+                ASSERT(STM_VALID_WRITE(w));
+                ASSERT((stm_get_features() & STM_FEATURE_OPLOG_FULL) != STM_FEATURE_OPLOG_FULL || STM_SAME_OP(stm_get_load_op(r), stm_get_store_op(w)));
+
+                const long newUsedW = STM_SAME_OPID(op, RSV_MAKE) ? newUsed + 1 : newUsed - 1;
+                ASSERT_FAIL(TM_SHARED_WRITE_UPDATE(w, reservationPtr->numUsed, newUsedW));
+# ifdef TM_DEBUG
+                printf("%s reservationPtr->numUsed:%p (old):%ld (new):%ld, write (new):%ld\n", STM_SAME_OPID(op, RSV_MAKE) ? "RSV_MAKE" : "RSV_CANCEL", &reservationPtr->numUsed, oldUsed, newUsed, newUsedW);
+# endif
+            } else {
+# ifdef TM_DEBUG
+                printf("%s reservationPtr->numUsed:%p (old):%ld (new):%ld\n", STM_SAME_OPID(op, RSV_MAKE) ? "RSV_MAKE" : "RSV_CANCEL", &reservationPtr->numUsed, oldUsed, newUsed);
+# endif
+            }
+
+            return STM_MERGE_OK;
+        }
+    }
+
+# ifdef TM_DEBUG
+    printf("\nRSV_MERGE UNSUPPORTED addr:%p\n", params->addr);
+# endif
+    return STM_MERGE_UNSUPPORTED;
+}
+
+__attribute__((constructor)) void reservation_init() {
+    TM_LOG_FFI_DECLARE;
+    TM_LOG_TYPE_DECLARE_INIT(*p[], {&ffi_type_pointer});
+    # define TM_LOG_OP TM_LOG_OP_INIT
+    # include "reservation.inc"
+    # undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_RESERVATION */

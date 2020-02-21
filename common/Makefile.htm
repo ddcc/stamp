@@ -1,0 +1,55 @@
+# ==============================================================================
+#
+# Makefile.stm
+#
+# ==============================================================================
+
+
+# ==============================================================================
+# Variables
+# ==============================================================================
+
+
+CFLAGS   += -I$(STM)/include -DHTM -mrtm
+LDFLAGS  += -L$(STM)/lib -rdynamic -Wl,--dynamic-linker=`pwd`/../../libcpuidoverride/libcpuidoverride.so
+LIBS     += -lstm -lffi
+
+ifeq ($(HTM_STM),1)
+  CFLAGS += -DHTM_STM -DSTM
+else ifeq ($(HTM_DIRECT_STM),1)
+  CFLAGS += -DHTM_DIRECT_STM -DSTM
+else ifeq ($(HTM_DIRECT_STM_NOREC),1)
+  CFLAGS += -DHTM_DIRECT_STM_NOREC -DSTM
+else ifeq ($(HTM_DIRECT),1)
+  CFLAGS += -DHTM_DIRECT
+endif
+
+ifdef HTM_RETRY_ABLE
+  CFLAGS += -DHTM_RETRY_ABLE=$(HTM_RETRY_ABLE)
+endif
+
+CPPFLAGS := $(CFLAGS)
+
+
+# ==============================================================================
+# Rules
+# ==============================================================================
+
+.PHONY: default
+default: $(PROG)
+
+.PHONY: clean
+clean:
+	$(RM) $(OBJS) $(PROG) $(OUTPUT)
+
+$(PROG): $(OBJS)
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $(PROG)
+
+include ../common/Makefile.common
+
+
+# ==============================================================================
+#
+# End of Makefile.stm
+#
+# ==============================================================================

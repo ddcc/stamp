@@ -91,12 +91,16 @@
 #include "hashtable.h"
 #include "segments.h"
 #include "sequencer.h"
+#include "tmstring.h"
 #include "table.h"
 #include "thread.h"
 #include "utility.h"
 #include "vector.h"
 #include "types.h"
 
+#define TM_LOG_OP TM_LOG_OP_DECLARE
+#include "sequencer.inc"
+#undef TM_LOG_OP
 
 struct endInfoEntry {
     bool_t isEnd;
@@ -114,6 +118,9 @@ struct constructEntry {
     long length;
 };
 
+HTM_STATS(global_tsx_status);
+
+TM_INIT_GLOBAL;
 
 /* =============================================================================
  * hashString
@@ -239,6 +246,10 @@ sequencer_alloc (long geneLength, long segmentLength, segments_t* segmentsPtr)
 void
 sequencer_run (void* argPtr)
 {
+#if !defined(ORIGINAL) && defined(MERGE_SEQUENCER)
+    __label__ restart;
+#endif /* !ORIGINAL && MERGE_SEQUENCER */
+
     TM_THREAD_ENTER();
 
     long threadId = thread_getId();
@@ -267,14 +278,37 @@ sequencer_run (void* argPtr)
     long j;
     long i_start;
     long i_stop;
+    long ii;
     long numUniqueSegment;
     long substringLength;
     long entryIndex;
 
+#if !defined(ORIGINAL) && defined(MERGE_SEQUENCER)
+    stm_merge_t merge(stm_merge_context_t *params) {
+        extern const stm_op_id_t HSTB_INSERT;
+
+        /* Just-in-time merge */
+        ASSERT(stm_active() || stm_committing());
+
+        /* Update occurred from HSTB_INSERT to SEQ_SEGMENT */
+        if (!params->leaf && STM_SAME_OPID(stm_get_op_opcode(params->current), SEQ_SEGMENT) && STM_SAME_OPID(stm_get_op_opcode(params->previous), HSTB_INSERT)) {
+#ifdef TM_DEBUG
+            printf("\nSEQ_SEGMENT_JIT <- HSTB_INSERT %ld\n", params->conflict.result.sint);
+#endif
+            /* Return value from TMHASHTABLE_INSERT is not read */
+            return STM_MERGE_OK;
+        }
+
+#ifdef TM_DEBUG
+        printf("\nSEQ_SEGMENT_JIT UNSUPPORTED addr:%p\n", params->addr);
+#endif
+        return STM_MERGE_UNSUPPORTED;
+    }
+#endif /* !ORIGINAL && MERGE_SEQUENCER */
+
     /*
      * Step 1: Remove duplicate segments
      */
-#if defined(HTM) || defined(STM)
     long numThread = thread_getNumThread();
     {
         /* Choose disjoint segments [i_start,i_stop) for each thread */
@@ -286,23 +320,72 @@ sequencer_run (void* argPtr)
             i_stop = i_start + partitionSize;
         }
     }
-#else /* !(HTM || STM) */
-    i_start = 0;
-    i_stop = numSegment;
-#endif /* !(HTM || STM) */
+
     for (i = i_start; i < i_stop; i+=CHUNK_STEP1) {
-        TM_BEGIN();
-        {
-            long ii;
+        HTM_TX_INIT;
+tsx_begin_insert:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
             long ii_stop = MIN(i_stop, (i+CHUNK_STEP1));
             for (ii = i; ii < ii_stop; ii++) {
                 void* segment = vector_at(segmentsContentsPtr, ii);
-                TMHASHTABLE_INSERT(uniqueSegmentsPtr,
-                                   segment,
-                                   segment);
+                HTMHASHTABLE_INSERT(uniqueSegmentsPtr, segment, segment);
             } /* ii */
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_insert);
+
+            STM_HTM_LOCK_SET();
+            TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_SEQUENCER)
+            TM_LOG_BEGIN(SEQ_SEGMENT, merge);
+#endif /* !ORIGINAL && MERGE_SEQUENCER */
+
+            long ii_stop = MIN(i_stop, (i+CHUNK_STEP1));
+#if !defined(ORIGINAL) && defined(STM_HTM)
+            int tsx = 0;
+#endif /* !ORIGINAL && STM_HTM */
+            for (ii = i; ii < ii_stop; ii++) {
+                if (!(i % 25)) {
+#if !defined(ORIGINAL) && defined(STM_HTM)
+                    STM_HTM_TX_INIT;
+                    if (!tsx && STM_HTM_BEGIN()) {
+stm_tsx_begin:
+                        STM_HTM_START(tsx_status, global_tsx_status);
+                        if (STM_HTM_STARTED(tsx_status)) {
+                            tsx = 1;
+                            goto restart;
+                        } else {
+                            HTM_RETRY(tsx_status, stm_tsx_begin);
+                            tsx = 0;
+                            STM_HTM_EXIT();
+                        }
+                    }
+#endif /* !ORIGINAL && STM_HTM */
+                }
+restart:;
+                void* segment = vector_at(segmentsContentsPtr, ii);
+#if !defined(ORIGINAL) && defined(STM_HTM)
+                if (tsx)
+                    HTMHASHTABLE_INSERT(uniqueSegmentsPtr, segment, segment);
+                else
+#endif /* !ORIGINAL && STM_HTM */
+                    TMHASHTABLE_INSERT(uniqueSegmentsPtr, segment, segment);
+            } /* ii */
+
+#if !defined(ORIGINAL) && defined(STM_HTM)
+            if (tsx) {
+                tsx = 0;
+                STM_HTM_END(global_tsx_status);
+                STM_HTM_EXIT();
+            }
+#endif /* !ORIGINAL && STM_HTM */
+
+            /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+            // TM_LOG_END(SEQ_SEGMENT, NULL);
+            TM_END();
+            STM_HTM_LOCK_UNSET();
         }
-        TM_END();
     }
 
     thread_barrier_wait();
@@ -368,7 +451,6 @@ sequencer_run (void* argPtr)
     }
 #endif /* OUTPUT_VERIFY */
 
-#if defined(HTM) || defined(STM)
     {
         /* Choose disjoint segments [i_start,i_stop) for each thread */
         long num = uniqueSegmentsPtr->numBucket;
@@ -385,11 +467,6 @@ sequencer_run (void* argPtr)
         long partitionSize = (numUniqueSegment + numThread/2) / numThread; /* with rounding */
         entryIndex = threadId * partitionSize;
     }
-#else /* !(HTM || STM) */
-    i_start = 0;
-    i_stop = uniqueSegmentsPtr->numBucket;
-    entryIndex = 0;
-#endif /* !(HTM || STM) */
 
     for (i = i_start; i < i_stop; i++) {
 
@@ -407,13 +484,27 @@ sequencer_run (void* argPtr)
             bool_t status;
 
             /* Find an empty constructEntries entry */
-            TM_BEGIN();
-            while (((void*)TM_SHARED_READ_P(constructEntries[entryIndex].segment)) != NULL) {
-                entryIndex = (entryIndex + 1) % numUniqueSegment; /* look for empty */
+            HTM_TX_INIT;
+tsx_begin_empty:
+            if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                HTM_LOCK_READ();
+                while (((void*)HTM_SHARED_READ_P(constructEntries[entryIndex].segment)) != NULL) {
+                    entryIndex = (entryIndex + 1) % numUniqueSegment; /* look for empty */
+                }
+                constructEntryPtr = &constructEntries[entryIndex];
+                HTM_SHARED_WRITE_P(constructEntryPtr->segment, segment);
+                HTM_END(global_tsx_status);
+            } else {
+                HTM_RETRY(tsx_status, tsx_begin_empty);
+
+                TM_BEGIN();
+                while (((void*)TM_SHARED_READ_P(constructEntries[entryIndex].segment)) != NULL) {
+                    entryIndex = (entryIndex + 1) % numUniqueSegment; /* look for empty */
+                }
+                constructEntryPtr = &constructEntries[entryIndex];
+                TM_SHARED_WRITE_P(constructEntryPtr->segment, segment);
+                TM_END();
             }
-            constructEntryPtr = &constructEntries[entryIndex];
-            TM_SHARED_WRITE_P(constructEntryPtr->segment, segment);
-            TM_END();
             entryIndex = (entryIndex + 1) % numUniqueSegment;
 
             /*
@@ -433,11 +524,22 @@ sequencer_run (void* argPtr)
             for (j = 1; j < segmentLength; j++) {
                 startHash = (ulong_t)segment[j-1] +
                             (startHash << 6) + (startHash << 16) - startHash;
-                TM_BEGIN();
-                status = TMTABLE_INSERT(startHashToConstructEntryTables[j],
-                                        (ulong_t)startHash,
-                                        (void*)constructEntryPtr );
-                TM_END();
+tsx_begin_hash1:
+                if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                    HTM_LOCK_READ();
+                    status = HTMTABLE_INSERT(startHashToConstructEntryTables[j],
+                        (ulong_t)startHash,
+                        (void*)constructEntryPtr );
+                    HTM_END(global_tsx_status);
+                } else {
+                    HTM_RETRY(tsx_status, tsx_begin_hash1);
+
+                    TM_BEGIN();
+                    status = TMTABLE_INSERT(startHashToConstructEntryTables[j],
+                                            (ulong_t)startHash,
+                                            (void*)constructEntryPtr );
+                    TM_END();
+                }
                 assert(status);
             }
 
@@ -446,11 +548,22 @@ sequencer_run (void* argPtr)
              */
             startHash = (ulong_t)segment[j-1] +
                         (startHash << 6) + (startHash << 16) - startHash;
-            TM_BEGIN();
-            status = TMTABLE_INSERT(hashToConstructEntryTable,
+tsx_begin_hash2:
+            if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                HTM_LOCK_READ();
+                status = HTMTABLE_INSERT(hashToConstructEntryTable,
                                     (ulong_t)startHash,
                                     (void*)constructEntryPtr);
-            TM_END();
+                HTM_END(global_tsx_status);
+            } else {
+                HTM_RETRY(tsx_status, tsx_begin_hash2);
+
+                TM_BEGIN();
+                status = TMTABLE_INSERT(hashToConstructEntryTable,
+                                    (ulong_t)startHash,
+                                    (void*)constructEntryPtr);
+                TM_END();
+            }
             assert(status);
         }
     }
@@ -470,7 +583,6 @@ sequencer_run (void* argPtr)
         long index_start;
         long index_stop;
 
-#if defined(HTM) || defined(STM)
         {
             /* Choose disjoint segments [index_start,index_stop) for each thread */
             long partitionSize = (numUniqueSegment + numThread/2) / numThread; /* with rounding */
@@ -481,10 +593,6 @@ sequencer_run (void* argPtr)
                 index_stop = index_start + partitionSize;
             }
         }
-#else /* !(HTM || STM) */
-        index_start = 0;
-        index_stop = numUniqueSegment;
-#endif /* !(HTM || STM) */
 
         /* Iterating over disjoint itervals in the range [0, numUniqueSegment) */
         for (entryIndex = index_start;
@@ -515,45 +623,90 @@ sequencer_run (void* argPtr)
                 long newLength = 0;
 
                 /* endConstructEntryPtr is local except for properties startPtr/endPtr/length */
-                TM_BEGIN();
+                HTM_TX_INIT;
+tsx_begin_sequence:
+                if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                    HTM_LOCK_READ();
+                    /* Check if matches */
+                    if (HTM_SHARED_READ(startConstructEntryPtr->isStart) &&
+                        (HTM_SHARED_READ_P(endConstructEntryPtr->startPtr) != startConstructEntryPtr) &&
+                        (Pstrncmp(startSegment,
+                                 &endSegment[segmentLength - substringLength],
+                                 substringLength) == 0))
+                        {
+                            HTM_SHARED_WRITE(startConstructEntryPtr->isStart, FALSE);
 
-                /* Check if matches */
-                if (TM_SHARED_READ(startConstructEntryPtr->isStart) &&
-                    (TM_SHARED_READ_P(endConstructEntryPtr->startPtr) != startConstructEntryPtr) &&
-                    (strncmp(startSegment,
-                             &endSegment[segmentLength - substringLength],
-                             substringLength) == 0))
-                {
-                    TM_SHARED_WRITE(startConstructEntryPtr->isStart, FALSE);
+                            constructEntry_t* startConstructEntry_endPtr;
+                            constructEntry_t* endConstructEntry_startPtr;
 
-                    constructEntry_t* startConstructEntry_endPtr;
-                    constructEntry_t* endConstructEntry_startPtr;
+                            /* Update endInfo (appended something so no longer end) */
+                            HTM_LOCAL_WRITE(endInfoEntries[entryIndex].isEnd, FALSE);
 
-                    /* Update endInfo (appended something so no longer end) */
-                    TM_LOCAL_WRITE(endInfoEntries[entryIndex].isEnd, FALSE);
+                            /* Update segment chain construct info */
+                            startConstructEntry_endPtr =
+                                (constructEntry_t*)HTM_SHARED_READ_P(startConstructEntryPtr->endPtr);
+                            endConstructEntry_startPtr =
+                                (constructEntry_t*)HTM_SHARED_READ_P(endConstructEntryPtr->startPtr);
 
-                    /* Update segment chain construct info */
-                    startConstructEntry_endPtr =
-                        (constructEntry_t*)TM_SHARED_READ_P(startConstructEntryPtr->endPtr);
-                    endConstructEntry_startPtr =
-                        (constructEntry_t*)TM_SHARED_READ_P(endConstructEntryPtr->startPtr);
+                            assert(startConstructEntry_endPtr);
+                            assert(endConstructEntry_startPtr);
+                            HTM_SHARED_WRITE_P(startConstructEntry_endPtr->startPtr,
+                                              endConstructEntry_startPtr);
+                            HTM_LOCAL_WRITE_P(endConstructEntryPtr->nextPtr,
+                                             startConstructEntryPtr);
+                            HTM_SHARED_WRITE_P(endConstructEntry_startPtr->endPtr,
+                                              startConstructEntry_endPtr);
+                            HTM_SHARED_WRITE(endConstructEntryPtr->overlap, substringLength);
+                            newLength = (long)HTM_SHARED_READ(endConstructEntry_startPtr->length) +
+                                        (long)HTM_SHARED_READ(startConstructEntryPtr->length) -
+                                        substringLength;
+                            HTM_SHARED_WRITE(endConstructEntry_startPtr->length, newLength);
+                        } /* if (matched) */
 
-                    assert(startConstructEntry_endPtr);
-                    assert(endConstructEntry_startPtr);
-                    TM_SHARED_WRITE_P(startConstructEntry_endPtr->startPtr,
-                                      endConstructEntry_startPtr);
-                    TM_LOCAL_WRITE_P(endConstructEntryPtr->nextPtr,
-                                     startConstructEntryPtr);
-                    TM_SHARED_WRITE_P(endConstructEntry_startPtr->endPtr,
-                                      startConstructEntry_endPtr);
-                    TM_SHARED_WRITE(endConstructEntryPtr->overlap, substringLength);
-                    newLength = (long)TM_SHARED_READ(endConstructEntry_startPtr->length) +
-                                (long)TM_SHARED_READ(startConstructEntryPtr->length) -
-                                substringLength;
-                    TM_SHARED_WRITE(endConstructEntry_startPtr->length, newLength);
-                } /* if (matched) */
+                        HTM_END(global_tsx_status);
+                    } else {
+                        HTM_RETRY(tsx_status, tsx_begin_sequence);
 
-                TM_END();
+                        TM_BEGIN();
+
+                        /* Check if matches */
+                        if (TM_SHARED_READ(startConstructEntryPtr->isStart) &&
+                            (TM_SHARED_READ_P(endConstructEntryPtr->startPtr) != startConstructEntryPtr) &&
+                            (Pstrncmp(startSegment,
+                                     &endSegment[segmentLength - substringLength],
+                                     substringLength) == 0))
+                        {
+                            TM_SHARED_WRITE(startConstructEntryPtr->isStart, FALSE);
+
+                            constructEntry_t* startConstructEntry_endPtr;
+                            constructEntry_t* endConstructEntry_startPtr;
+
+                            /* Update endInfo (appended something so no longer end) */
+                            TM_LOCAL_WRITE(endInfoEntries[entryIndex].isEnd, FALSE);
+
+                            /* Update segment chain construct info */
+                            startConstructEntry_endPtr =
+                                (constructEntry_t*)TM_SHARED_READ_P(startConstructEntryPtr->endPtr);
+                            endConstructEntry_startPtr =
+                                (constructEntry_t*)TM_SHARED_READ_P(endConstructEntryPtr->startPtr);
+
+                            assert(startConstructEntry_endPtr);
+                            assert(endConstructEntry_startPtr);
+                            TM_SHARED_WRITE_P(startConstructEntry_endPtr->startPtr,
+                                              endConstructEntry_startPtr);
+                            TM_LOCAL_WRITE_P(endConstructEntryPtr->nextPtr,
+                                             startConstructEntryPtr);
+                            TM_SHARED_WRITE_P(endConstructEntry_startPtr->endPtr,
+                                              startConstructEntry_endPtr);
+                            TM_SHARED_WRITE(endConstructEntryPtr->overlap, substringLength);
+                            newLength = (long)TM_SHARED_READ(endConstructEntry_startPtr->length) +
+                                        (long)TM_SHARED_READ(startConstructEntryPtr->length) -
+                                        substringLength;
+                            TM_SHARED_WRITE(endConstructEntry_startPtr->length, newLength);
+                        } /* if (matched) */
+
+                    TM_END();
+                }
 
                 if (!endInfoEntries[entryIndex].isEnd) { /* if there was a match */
                     break;
@@ -979,3 +1132,12 @@ main ()
  *
  * =============================================================================
  */
+
+#if !defined(ORIGINAL) && defined(MERGE_SEQUENCER)
+__attribute__((constructor)) void sequencer_init() {
+    TM_LOG_FFI_DECLARE;
+    #define TM_LOG_OP TM_LOG_OP_INIT
+    #include "sequencer.inc"
+    #undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_SEQUENCER */

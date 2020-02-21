@@ -113,6 +113,7 @@
 
 extern double global_time;
 
+HTM_STATS(global_tsx_status);
 
 /* =============================================================================
  * usage
@@ -413,7 +414,8 @@ MAIN(argc, argv)
                     float rj = tok ? atof(tok) : 0.0;
                     success = success ? tok && fabsf(rj - cluster_centres[i][j]) <= (max_nclusters + min_nclusters) * 0.5 * 10 * threshold : success;
 # ifdef TM_DEBUG
-                    printf("actual: %f, computed: %f, threshold: %f\n", cluster_centres[i][j], rj, (max_nclusters + min_nclusters) * 0.5 * threshold);
+                    if (!success)
+                        printf("actual: %f, computed: %f, threshold: %f\n", cluster_centres[i][j], rj, (max_nclusters + min_nclusters) * 0.5 * threshold);
 # endif
                     assert(success);
                 }
@@ -428,6 +430,8 @@ MAIN(argc, argv)
 #endif /* OUTPUT_VERIFY */
 
     printf("Cluster time = %f\n", global_time);
+
+    HTM_STATS_PRINT(global_tsx_status);
 
     free(cluster_assign);
     free(attributes[0]);

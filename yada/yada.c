@@ -96,6 +96,9 @@ long     global_totalNumAdded = 0;
 long     global_numProcess    = 0;
 
 
+HTM_STATS_EXTERN(global_tsx_status);
+
+
 /* =============================================================================
  * displayUsage
  * =============================================================================
@@ -204,17 +207,36 @@ process ()
 
         element_t* elementPtr;
 
-        TM_BEGIN();
-        elementPtr = TMHEAP_REMOVE(workHeapPtr);
-        TM_END();
+        HTM_TX_INIT;
+tsx_begin_remove:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            elementPtr = HTMHEAP_REMOVE(workHeapPtr);
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_remove);
+
+            TM_BEGIN();
+            elementPtr = TMHEAP_REMOVE(workHeapPtr);
+            TM_END();
+        }
         if (elementPtr == NULL) {
             break;
         }
 
         bool_t isGarbage;
-        TM_BEGIN();
-        isGarbage = TMELEMENT_ISGARBAGE(elementPtr);
-        TM_END();
+tsx_begin_isgarbage1:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            isGarbage = HTMELEMENT_ISGARBAGE(elementPtr);
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_isgarbage1);
+
+            TM_BEGIN();
+            isGarbage = TMELEMENT_ISGARBAGE(elementPtr);
+            TM_END();
+        }
         if (isGarbage) {
             /*
              * Handle delayed deallocation
@@ -224,16 +246,36 @@ process ()
         }
 
         long numAdded;
+tsx_begin_refine:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            PREGION_CLEARBAD(regionPtr);
+            numAdded = HTMREGION_REFINE(regionPtr, elementPtr, meshPtr);
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_refine);
 
-        TM_BEGIN();
-        PREGION_CLEARBAD(regionPtr);
-        numAdded = TMREGION_REFINE(regionPtr, elementPtr, meshPtr);
-        TM_END();
+            STM_HTM_LOCK_SET();
+            TM_BEGIN_NOOVR();
+            PREGION_CLEARBAD(regionPtr);
+            numAdded = TMREGION_REFINE(regionPtr, elementPtr, meshPtr);
+            TM_END();
+            STM_HTM_LOCK_UNSET();
+        }
+tsx_begin_isgarbage2:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            ELEMENT_SETISREFERENCED(elementPtr, FALSE);
+            isGarbage = HTMELEMENT_ISGARBAGE(elementPtr);
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_isgarbage2);
 
-        TM_BEGIN();
-        TMELEMENT_SETISREFERENCED(elementPtr, FALSE);
-        isGarbage = TMELEMENT_ISGARBAGE(elementPtr);
-        TM_END();
+            TM_BEGIN();
+            TMELEMENT_SETISREFERENCED(elementPtr, FALSE);
+            isGarbage = TMELEMENT_ISGARBAGE(elementPtr);
+            TM_END();
+        }
         if (isGarbage) {
             /*
              * Handle delayed deallocation
@@ -242,23 +284,45 @@ process ()
         }
 
         totalNumAdded += numAdded;
+tsx_begin_transferbad:
+        if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+            HTM_LOCK_READ();
+            HTMREGION_TRANSFERBAD(regionPtr, workHeapPtr);
+            HTM_END(global_tsx_status);
+        } else {
+            HTM_RETRY(tsx_status, tsx_begin_transferbad);
 
-        TM_BEGIN();
-        TMREGION_TRANSFERBAD(regionPtr, workHeapPtr);
-        TM_END();
+            TM_BEGIN();
+            TMREGION_TRANSFERBAD(regionPtr, workHeapPtr);
+            TM_END();
+        }
 
         numProcess++;
 
     }
+    HTM_TX_INIT;
+tsx_begin_add:
+    if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+        HTM_LOCK_READ();
+        HTM_SHARED_WRITE(global_totalNumAdded,
+                        HTM_SHARED_READ(global_totalNumAdded) + totalNumAdded);
+        HTM_SHARED_WRITE(global_numProcess,
+                        HTM_SHARED_READ(global_numProcess) + numProcess);
 
-    TM_BEGIN();
-    TM_SHARED_WRITE(global_totalNumAdded,
-                    TM_SHARED_READ(global_totalNumAdded) + totalNumAdded);
-    TM_SHARED_WRITE(global_numProcess,
-                    TM_SHARED_READ(global_numProcess) + numProcess);
+        HTMREGION_FREEBAD(regionPtr);
+        HTM_END(global_tsx_status);
+    } else {
+        HTM_RETRY(tsx_status, tsx_begin_add);
 
-    TMregion_freeBad(regionPtr);
-    TM_END();
+        TM_BEGIN();
+        TM_SHARED_WRITE(global_totalNumAdded,
+                        TM_SHARED_READ(global_totalNumAdded) + totalNumAdded);
+        TM_SHARED_WRITE(global_numProcess,
+                        TM_SHARED_READ(global_numProcess) + numProcess);
+
+        TMREGION_FREEBAD(regionPtr);
+        TM_END();
+    }
 
     PREGION_CLEARBAD(regionPtr);
     PREGION_FREE(regionPtr);
@@ -322,6 +386,8 @@ MAIN(argc, argv)
     printf("Triangulation time = %f\n",
            TIMER_DIFF_SECONDS(start, stop));
     fflush(stdout);
+
+    HTM_STATS_PRINT(global_tsx_status);
 
     /*
      * Check solution

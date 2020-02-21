@@ -1,30 +1,17 @@
 # ==============================================================================
 #
-# Defines.common.mk
+# Makefile.stm
 #
 # ==============================================================================
 
 
-CC       := gcc
-CFLAGS   += -Wall -fgnu-tm
-CFLAGS   += -O2 -I$(LIB)
-CPP      := g++
-CPPFLAGS += $(CFLAGS)
-LD       := g++
-LIBS     += -fgnu-tm
-
-# Remove these files when doing clean
-OUTPUT +=
-
-LIB := ../lib
-
-STM :=
-
-LOSTM :=
+include ../common/Defines.common.seq.mk
+include ./Defines.common.mk
+include ../common/Makefile.seq
 
 
 # ==============================================================================
 #
-# End of Defines.common.mk
+# End of Makefile.stm
 #
 # ==============================================================================

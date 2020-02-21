@@ -9,10 +9,12 @@
 # Variables
 # ==============================================================================
 
-CFLAGS   += -DSTM -I$(STM)/include
+
+CFLAGS   += -DITM
+LDFLAGS  += -rdynamic -Wl,--dynamic-linker=`pwd`/../../libcpuidoverride/libcpuidoverride.so
+LIBS     += -litm
+
 CPPFLAGS := $(CFLAGS)
-LDFLAGS  +=
-LIBS     +=
 
 
 # ==============================================================================

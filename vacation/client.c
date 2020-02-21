@@ -77,6 +77,15 @@
 #include "thread.h"
 #include "types.h"
 
+#if !defined(ORIGINAL) && defined(MERGE_CLIENT)
+# define TM_LOG_OP TM_LOG_OP_DECLARE
+# include "client.inc"
+# undef TM_LOG_OP
+#endif /* !ORIGINAL && MERGE_CLIENT */
+
+TM_INIT_GLOBAL;
+
+HTM_STATS_EXTERN(global_tsx_status);
 
 /* =============================================================================
  * client_alloc
@@ -153,9 +162,69 @@ selectAction (long r, long percentUser)
  * -- Execute list operations on the database
  * =============================================================================
  */
+
 void
 client_run (void* argPtr)
 {
+#if !defined(ORIGINAL) && defined(MERGE_CLIENT)
+    stm_merge_t merge(stm_merge_context_t *params) {
+        const stm_op_id_t op = stm_get_op_opcode(params->current);
+
+        if (params->leaf)
+            return STM_MERGE_UNSUPPORTED;
+
+        if (STM_SAME_OPID(op, CLT_RESERVE)) {
+#ifdef MERGE_MANAGER
+            extern const stm_op_id_t MGR_ADDCUSTOMER, MGR_RESERVE, MGR_QUERYFREE;
+            const stm_op_id_t prev = stm_get_op_opcode(params->previous);
+
+            if (STM_SAME_OPID(prev, MGR_ADDCUSTOMER)) {
+# ifdef TM_DEBUG
+                printf("\nCLT_RESERVE_JIT <- MGR_ADDCUSTOMER %ld\n", params->conflict.result.sint);
+# endif
+                /* Return value is unused */
+                return STM_MERGE_OK;
+            } else if (STM_SAME_OPID(prev, MGR_RESERVE)) {
+# ifdef TM_DEBUG
+                printf("\nCLT_RESERVE_JIT <- MGR_RESERVE %ld\n", params->conflict.result.sint);
+# endif
+                /* Return value is unused */
+                return STM_MERGE_OK;
+            } else if (STM_SAME_OPID(prev, MGR_QUERYFREE)) {
+# ifdef TM_DEBUG
+                printf("\nCLT_RESERVE_JIT <- MGR_QUERYFREE %ld\n", params->conflict.previous_result.sint);
+# endif
+                /* Control flow is unchanged */
+                if ((params->conflict.previous_result.sint >= 0) == (params->conflict.result.sint >= 0))
+                    return STM_MERGE_OK;
+            }
+#endif /* MERGE_MANAGER */
+# ifdef TM_DEBUG
+            printf("\nCLT_RESERVE_JIT UNSUPPORTED addr:%p\n", params->addr);
+# endif
+        } else if (STM_SAME_OPID(op, CLT_UPDATE)) {
+#ifdef MERGE_MANAGER
+            extern const stm_op_id_t MGR_ADDRESERVE;
+            ASSERT(STM_SAME_OPID(stm_get_op_opcode(params->previous), MGR_ADDRESERVE));
+# ifdef TM_DEBUG
+            printf("\nCLT_UPDATE_JIT <- MGR_ADDRESERVE %ld\n", params->conflict.result.sint);
+# endif
+            /* Return value is unused */
+            return STM_MERGE_OK;
+#endif /* MERGE_MANAGER */
+        } else if (STM_SAME_OPID(op, CLT_DELCUSTOMER)) {
+# ifdef TM_DEBUG
+            printf("\nCLT_DELCUSTOMER_JIT addr:%p\n", params->addr);
+# endif
+        }
+
+# ifdef TM_DEBUG
+        printf("\nCLT_MERGE_JIT UNSUPPORTED addr:%p\n", params->addr);
+# endif
+        return STM_MERGE_UNSUPPORTED;
+    }
+#endif /* !ORIGINAL && MERGE_CLIENT */
+
     TM_THREAD_ENTER();
 
     long myId = thread_getId();
@@ -194,63 +263,142 @@ client_run (void* argPtr)
                     ids[n] = (random_generate(randomPtr) % queryRange) + 1;
                 }
                 bool_t isFound = FALSE;
-                TM_BEGIN();
-                for (n = 0; n < numQuery; n++) {
-                    long t = types[n];
-                    long id = ids[n];
-                    long price = -1;
-                    switch (t) {
-                        case RESERVATION_CAR:
-                            if (MANAGER_QUERY_CAR(managerPtr, id) >= 0) {
-                                price = MANAGER_QUERY_CAR_PRICE(managerPtr, id);
-                            }
-                            break;
-                        case RESERVATION_FLIGHT:
-                            if (MANAGER_QUERY_FLIGHT(managerPtr, id) >= 0) {
-                                price = MANAGER_QUERY_FLIGHT_PRICE(managerPtr, id);
-                            }
-                            break;
-                        case RESERVATION_ROOM:
-                            if (MANAGER_QUERY_ROOM(managerPtr, id) >= 0) {
-                                price = MANAGER_QUERY_ROOM_PRICE(managerPtr, id);
-                            }
-                            break;
-                        default:
-                            assert(0);
+                HTM_TX_INIT;
+tsx_begin_make:
+                if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                    HTM_LOCK_READ();
+                    for (n = 0; n < numQuery; n++) {
+                        long t = types[n];
+                        long id = ids[n];
+                        long price = -1;
+                        switch (t) {
+                            case RESERVATION_CAR:
+                                if (HTMMANAGER_QUERY_CAR(managerPtr, id) >= 0) {
+                                    price = HTMMANAGER_QUERY_CAR_PRICE(managerPtr, id);
+                                }
+                                break;
+                            case RESERVATION_FLIGHT:
+                                if (HTMMANAGER_QUERY_FLIGHT(managerPtr, id) >= 0) {
+                                    price = HTMMANAGER_QUERY_FLIGHT_PRICE(managerPtr, id);
+                                }
+                                break;
+                            case RESERVATION_ROOM:
+                                if (HTMMANAGER_QUERY_ROOM(managerPtr, id) >= 0) {
+                                    price = HTMMANAGER_QUERY_ROOM_PRICE(managerPtr, id);
+                                }
+                                break;
+                            default:
+                                assert(0);
+                        }
+                        if (price > maxPrices[t]) {
+                            maxPrices[t] = price;
+                            maxIds[t] = id;
+                            isFound = TRUE;
+                        }
+                    } /* for n */
+                    if (isFound) {
+                        HTMMANAGER_ADD_CUSTOMER(managerPtr, customerId);
                     }
-                    if (price > maxPrices[t]) {
-                        maxPrices[t] = price;
-                        maxIds[t] = id;
-                        isFound = TRUE;
+                    if (maxIds[RESERVATION_CAR] > 0) {
+                        HTMMANAGER_RESERVE_CAR(managerPtr,
+                                            customerId, maxIds[RESERVATION_CAR]);
                     }
-                } /* for n */
-                if (isFound) {
-                    MANAGER_ADD_CUSTOMER(managerPtr, customerId);
+                    if (maxIds[RESERVATION_FLIGHT] > 0) {
+                        HTMMANAGER_RESERVE_FLIGHT(managerPtr,
+                                               customerId, maxIds[RESERVATION_FLIGHT]);
+                    }
+                    if (maxIds[RESERVATION_ROOM] > 0) {
+                        HTMMANAGER_RESERVE_ROOM(managerPtr,
+                                             customerId, maxIds[RESERVATION_ROOM]);
+                    }
+                    HTM_END(global_tsx_status);
+                } else {
+                    HTM_RETRY(tsx_status, tsx_begin_make);
+
+                    TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_CLIENT)
+                    TM_LOG_BEGIN(CLT_RESERVE, merge);
+#endif /* !ORIGINAL && MERGE_CLIENT */
+                    for (n = 0; n < numQuery; n++) {
+                        long t = types[n];
+                        long id = ids[n];
+                        long price = -1;
+                        switch (t) {
+                            case RESERVATION_CAR:
+                                if (MANAGER_QUERY_CAR(managerPtr, id) >= 0) {
+                                    price = MANAGER_QUERY_CAR_PRICE(managerPtr, id);
+                                }
+                                break;
+                            case RESERVATION_FLIGHT:
+                                if (MANAGER_QUERY_FLIGHT(managerPtr, id) >= 0) {
+                                    price = MANAGER_QUERY_FLIGHT_PRICE(managerPtr, id);
+                                }
+                                break;
+                            case RESERVATION_ROOM:
+                                if (MANAGER_QUERY_ROOM(managerPtr, id) >= 0) {
+                                    price = MANAGER_QUERY_ROOM_PRICE(managerPtr, id);
+                                }
+                                break;
+                            default:
+                                assert(0);
+                        }
+                        if (price > maxPrices[t]) {
+                            maxPrices[t] = price;
+                            maxIds[t] = id;
+                            isFound = TRUE;
+                        }
+                    } /* for n */
+                    if (isFound) {
+                        MANAGER_ADD_CUSTOMER(managerPtr, customerId);
+                    }
+                    if (maxIds[RESERVATION_CAR] > 0) {
+                        MANAGER_RESERVE_CAR(managerPtr,
+                                            customerId, maxIds[RESERVATION_CAR]);
+                    }
+                    if (maxIds[RESERVATION_FLIGHT] > 0) {
+                        MANAGER_RESERVE_FLIGHT(managerPtr,
+                                               customerId, maxIds[RESERVATION_FLIGHT]);
+                    }
+                    if (maxIds[RESERVATION_ROOM] > 0) {
+                        MANAGER_RESERVE_ROOM(managerPtr,
+                                             customerId, maxIds[RESERVATION_ROOM]);
+                    }
+                    /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+                    // TM_LOG_END(CLT_RESERVE, NULL);
+                    TM_END();
                 }
-                if (maxIds[RESERVATION_CAR] > 0) {
-                    MANAGER_RESERVE_CAR(managerPtr,
-                                        customerId, maxIds[RESERVATION_CAR]);
-                }
-                if (maxIds[RESERVATION_FLIGHT] > 0) {
-                    MANAGER_RESERVE_FLIGHT(managerPtr,
-                                           customerId, maxIds[RESERVATION_FLIGHT]);
-                }
-                if (maxIds[RESERVATION_ROOM] > 0) {
-                    MANAGER_RESERVE_ROOM(managerPtr,
-                                         customerId, maxIds[RESERVATION_ROOM]);
-                }
-                TM_END();
+
                 break;
             }
 
             case ACTION_DELETE_CUSTOMER: {
                 long customerId = random_generate(randomPtr) % queryRange + 1;
-                TM_BEGIN();
-                long bill = MANAGER_QUERY_CUSTOMER_BILL(managerPtr, customerId);
-                if (bill >= 0) {
-                    MANAGER_DELETE_CUSTOMER(managerPtr, customerId);
+                HTM_TX_INIT;
+tsx_begin_delete:
+                if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                    HTM_LOCK_READ();
+                    long bill = HTMMANAGER_QUERY_CUSTOMER_BILL(managerPtr, customerId);
+                    if (bill >= 0) {
+                        HTMMANAGER_DELETE_CUSTOMER(managerPtr, customerId);
+                    }
+                    HTM_END(global_tsx_status);
+                } else {
+                    HTM_RETRY(tsx_status, tsx_begin_delete);
+
+                    TM_BEGIN();
+
+#if !defined(ORIGINAL) && defined(MERGE_CLIENT)
+                    TM_LOG_BEGIN(CLT_DELCUSTOMER, NULL);
+#endif /* !ORIGINAL && MERGE_CLIENT */
+                    long bill = MANAGER_QUERY_CUSTOMER_BILL(managerPtr, customerId);
+                    if (bill >= 0) {
+                        MANAGER_DELETE_CUSTOMER(managerPtr, customerId);
+                    }
+                    /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+                    // TM_LOG_END(CLT_DELCUSTOMER, NULL);
+                    TM_END();
                 }
-                TM_END();
+
                 break;
             }
 
@@ -265,43 +413,93 @@ client_run (void* argPtr)
                         prices[n] = ((random_generate(randomPtr) % 5) * 10) + 50;
                     }
                 }
-                TM_BEGIN();
-                for (n = 0; n < numUpdate; n++) {
-                    long t = types[n];
-                    long id = ids[n];
-                    long doAdd = ops[n];
-                    if (doAdd) {
-                        long newPrice = prices[n];
-                        switch (t) {
-                            case RESERVATION_CAR:
-                                MANAGER_ADD_CAR(managerPtr, id, 100, newPrice);
-                                break;
-                            case RESERVATION_FLIGHT:
-                                MANAGER_ADD_FLIGHT(managerPtr, id, 100, newPrice);
-                                break;
-                            case RESERVATION_ROOM:
-                                MANAGER_ADD_ROOM(managerPtr, id, 100, newPrice);
-                                break;
-                            default:
-                                assert(0);
-                        }
-                    } else { /* do delete */
-                        switch (t) {
-                            case RESERVATION_CAR:
-                                MANAGER_DELETE_CAR(managerPtr, id, 100);
-                                break;
-                            case RESERVATION_FLIGHT:
-                                MANAGER_DELETE_FLIGHT(managerPtr, id);
-                                break;
-                            case RESERVATION_ROOM:
-                                MANAGER_DELETE_ROOM(managerPtr, id, 100);
-                                break;
-                            default:
-                                assert(0);
+                HTM_TX_INIT;
+tsx_begin_update:
+                if (HTM_BEGIN(tsx_status, global_tsx_status)) {
+                    HTM_LOCK_READ();
+                    for (n = 0; n < numUpdate; n++) {
+                        long t = types[n];
+                        long id = ids[n];
+                        long doAdd = ops[n];
+                        if (doAdd) {
+                            long newPrice = prices[n];
+                            switch (t) {
+                                case RESERVATION_CAR:
+                                    HTMMANAGER_ADD_CAR(managerPtr, id, 100, newPrice);
+                                    break;
+                                case RESERVATION_FLIGHT:
+                                    HTMMANAGER_ADD_FLIGHT(managerPtr, id, 100, newPrice);
+                                    break;
+                                case RESERVATION_ROOM:
+                                    HTMMANAGER_ADD_ROOM(managerPtr, id, 100, newPrice);
+                                    break;
+                                default:
+                                    assert(0);
+                            }
+                        } else { /* do delete */
+                            switch (t) {
+                                case RESERVATION_CAR:
+                                    HTMMANAGER_DELETE_CAR(managerPtr, id, 100);
+                                    break;
+                                case RESERVATION_FLIGHT:
+                                    HTMMANAGER_DELETE_FLIGHT(managerPtr, id);
+                                    break;
+                                case RESERVATION_ROOM:
+                                    HTMMANAGER_DELETE_ROOM(managerPtr, id, 100);
+                                    break;
+                                default:
+                                    assert(0);
+                            }
                         }
                     }
+                    HTM_END(global_tsx_status);
+                } else {
+                    HTM_RETRY(tsx_status, tsx_begin_update);
+
+                    TM_BEGIN();
+#if !defined(ORIGINAL) && defined(MERGE_CLIENT)
+                    TM_LOG_BEGIN(CLT_UPDATE, merge);
+#endif /* !ORIGINAL && MERGE_CLIENT */
+                    for (n = 0; n < numUpdate; n++) {
+                        long t = types[n];
+                        long id = ids[n];
+                        long doAdd = ops[n];
+                        if (doAdd) {
+                            long newPrice = prices[n];
+                            switch (t) {
+                                case RESERVATION_CAR:
+                                    MANAGER_ADD_CAR(managerPtr, id, 100, newPrice);
+                                    break;
+                                case RESERVATION_FLIGHT:
+                                    MANAGER_ADD_FLIGHT(managerPtr, id, 100, newPrice);
+                                    break;
+                                case RESERVATION_ROOM:
+                                    MANAGER_ADD_ROOM(managerPtr, id, 100, newPrice);
+                                    break;
+                                default:
+                                    assert(0);
+                            }
+                        } else { /* do delete */
+                            switch (t) {
+                                case RESERVATION_CAR:
+                                    MANAGER_DELETE_CAR(managerPtr, id, 100);
+                                    break;
+                                case RESERVATION_FLIGHT:
+                                    MANAGER_DELETE_FLIGHT(managerPtr, id);
+                                    break;
+                                case RESERVATION_ROOM:
+                                    MANAGER_DELETE_ROOM(managerPtr, id, 100);
+                                    break;
+                                default:
+                                    assert(0);
+                            }
+                        }
+                    }
+                    /* Since the merge function remains in scope, do not explicitly end the operation; it will be done implicitly when the transaction ends */
+                    // TM_LOG_END(CLT_UPDATE, NULL);
+                    TM_END();
                 }
-                TM_END();
+
                 break;
             }
 
@@ -328,6 +526,11 @@ client_run (void* argPtr)
  * =============================================================================
  */
 
-
-
-
+#if !defined(ORIGINAL) && defined(MERGE_CLIENT)
+__attribute__((constructor)) void client_init() {
+    TM_LOG_FFI_DECLARE;
+    # define TM_LOG_OP TM_LOG_OP_INIT
+    # include "client.inc"
+    # undef TM_LOG_OP
+}
+#endif /* !ORIGINAL && MERGE_CLIENT */

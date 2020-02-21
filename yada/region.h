@@ -110,38 +110,89 @@ Pregion_free (region_t* regionPtr);
  * =============================================================================
  */
 long
+region_refine (region_t* regionPtr, element_t* elementPtr, mesh_t* meshPtr);
+
+long
+HTMregion_refine (region_t* regionPtr, element_t* elementPtr, mesh_t* meshPtr);
+
+TM_CANCELLABLE
+long
 TMregion_refine (TM_ARGDECL
                  region_t* regionPtr, element_t* elementPtr, mesh_t* meshPtr);
-
 
 /* =============================================================================
  * Pregion_clearBad
  * =============================================================================
  */
+TM_PURE
 void
 Pregion_clearBad (region_t* regionPtr);
+
+
+/* =============================================================================
+ * region_freeBad
+ * =============================================================================
+ */
+void
+region_freeBad (region_t* regionPtr);
+
+
+/* =============================================================================
+ * HTMregion_freeBad
+ * =============================================================================
+ */
+void
+HTMregion_freeBad (region_t* regionPtr);
 
 
 /* =============================================================================
  * TMregion_freeBad
  * =============================================================================
  */
+TM_CALLABLE
 void
-TMregion_freeBad (region_t* regionPtr);
+TMregion_freeBad (TM_ARGDECL  region_t* regionPtr);
+
+
+/* =============================================================================
+ * region_transferBad
+ * =============================================================================
+ */
+void
+region_transferBad (region_t* regionPtr, heap_t* workHeapPtr);
+
+
+/* =============================================================================
+ * HTMregion_transferBad
+ * =============================================================================
+ */
+void
+HTMregion_transferBad (region_t* regionPtr, heap_t* workHeapPtr);
 
 
 /* =============================================================================
  * TMregion_transferBad
  * =============================================================================
  */
+TM_CALLABLE
 void
 TMregion_transferBad (TM_ARGDECL  region_t* regionPtr, heap_t* workHeapPtr);
 
 
+#define REGION_REFINE(r, e, m)          region_refine(r, e, m)
+#define REGION_FREEBAD(r)               region_freeBad(r)
+#define REGION_TRANSFERBAD(r, q)        region_transferBad(r, q)
+
 #define PREGION_ALLOC()                 Pregion_alloc()
 #define PREGION_FREE(r)                 Pregion_free(r)
 #define PREGION_CLEARBAD(r)             Pregion_clearBad(r)
-#define TMREGION_REFINE(r, e, m)        TMregion_refine(TM_ARG  r, e, m)
+
+#define HTMREGION_FREEBAD(r)            HTMregion_freeBad(r)
+#define HTMREGION_REFINE(r, e, m)       HTMregion_refine(r, e, m)
+#define HTMREGION_TRANSFERBAD(r, q)     HTMregion_transferBad(r, q)
+
+#define TMREGION_FREEBAD(r)             TMregion_freeBad(r)
+#define TMREGION_REFINE(r, e, m)       TMregion_refine(TM_ARG  r, e, m)
 #define TMREGION_TRANSFERBAD(r, q)      TMregion_transferBad(TM_ARG  r, q)
 
 
