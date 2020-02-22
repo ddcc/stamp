@@ -61,22 +61,27 @@ void work(data_t *data) {
 
 #if !defined(ORIGINAL) && defined(MERGE_ARRAY)
     stm_merge_t merge(stm_merge_context_t *params) {
+        /* Check the conflict address is at an in-bounds array index */
         if ((unsigned long *)params->addr >= data->array && (unsigned long *)params->addr < data->array + data->size) {
+            /* Compute the array index */
             unsigned long offset = (unsigned long *)params->addr - data->array;
 
             ASSERT(params->leaf == 1);
             ASSERT(ENTRY_VALID(params->conflict.entries->e1));
+            /* Opaque objects representing the conficting read, and an optional write at that array index */
             const stm_read_t r = ENTRY_GET_READ(params->conflict.entries->e1);
-
             const stm_write_t w = TM_SHARED_DID_WRITE(data->array[offset]);
 
-            /* Fetch the new value */
+            /* Fetch the old and new values of the read */
             unsigned long old, new, write = 0;
             ASSERT_FAIL(TM_SHARED_READ_VALUE(r, data->array[offset], old));
             ASSERT_FAIL(TM_SHARED_READ_UPDATE(r, data->array[offset], new));
+
+            /* If the values are the same, we are done */
             if (old == new)
                 return STM_MERGE_OK;
 
+            /* If the write is valid, fetch its value */
             if (STM_VALID_WRITE(w))
                 ASSERT_FAIL(TM_SHARED_WRITE_VALUE(w, data->array[offset], write));
 
@@ -84,9 +89,11 @@ void work(data_t *data) {
             printf("\nARRAY_ADD_JIT data->array[%ld] read (old):%ld (new):%ld write (old):%ld\n", offset, old, new, write);
 #  endif
 
+            /* If the write is valid, update it now by re-incrementing */
             if (STM_VALID_WRITE(w))
                 ASSERT_FAIL(TM_SHARED_WRITE_UPDATE(w, data->array[offset], (new - old) + write));
 
+            /* Repair succeeded */
             return STM_MERGE_OK;
         }
 
